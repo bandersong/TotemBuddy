@@ -1,0 +1,55 @@
+name: Release
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'TotemDeck.toc'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version from TOC
+        id: version
+        run: |
+          VERSION=$(grep -oP '## Version: \K.*' TotemDeck.toc)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Found version: $VERSION"
+
+      - name: Check if tag exists
+        id: check_tag
+        run: |
+          if git rev-parse "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create addon package
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          mkdir -p TotemDeck/UI
+          cp TotemDeck.toc README.md LICENSE TotemDeck/
+          cp Core.lua Commands.lua Events.lua Macros.lua TotemDeck/
+          cp UI/*.lua TotemDeck/UI/
+          zip -r TotemDeck-${{ steps.version.outputs.version }}.zip TotemDeck
+
+      - name: Create Release
+        if: steps.check_tag.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: TotemDeck v${{ steps.version.outputs.version }}
+          files: TotemDeck-${{ steps.version.outputs.version }}.zip
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

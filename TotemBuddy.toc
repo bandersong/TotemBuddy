@@ -1,0 +1,18 @@
+## Interface: 20505
+## X-Compatible-With: 20501, 20502, 20503, 20504, 20505
+## Title: TotemBuddy
+## Notes: Streamlined totem management with one-click casting, hover popups, weapon buff buttons, and Ankh tracking—all in a minimal, moveable bar.
+## Author: Player
+## Version: 1.2.14
+## SavedVariables: TotemBuddyDB
+
+Core.lua
+Macros.lua
+UI/ActionBar.lua
+UI/Popup.lua
+UI/Timers.lua
+UI/Reincarnation.lua
+UI/WeaponBuff.lua
+UI/Config.lua
+Events.lua
+Commands.lua
