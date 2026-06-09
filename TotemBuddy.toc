@@ -1,9 +1,9 @@
 ## Interface: 20505
 ## X-Compatible-With: 20501, 20502, 20503, 20504, 20505
 ## Title: TotemBuddy
-## Notes: Streamlined totem management with one-click casting, hover popups, weapon buff buttons, and Ankh tracking—all in a minimal, moveable bar.
+## Notes: Resto-shaman totem sets you can save and swap (with keybinds for in-combat switching), a quick-react utility bar, plus one-click casting, hover popups, timers, weapon buffs, and Ankh tracking.
 ## Author: Player
-## Version: 1.2.14
+## Version: 2.0.0
 ## SavedVariables: TotemBuddyDB
 
 Core.lua
