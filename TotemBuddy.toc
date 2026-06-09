@@ -8,6 +8,7 @@
 
 Core.lua
 Macros.lua
+Sets.lua
 UI/ActionBar.lua
 UI/Popup.lua
 UI/Timers.lua

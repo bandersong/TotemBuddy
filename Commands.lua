@@ -103,9 +103,51 @@ end
 SLASH_TOTEMBUDDY1 = "/tb"
 
 SlashCmdList["TOTEMBUDDY"] = function(msg)
+    msg = msg or ""
     local cmd = msg:lower():trim()
+    -- First word + remaining argument; the argument keeps its original case
+    -- so set names like "Raid Heal" are preserved.
+    local rawCmd, rawArg = msg:match("^(%S+)%s+(.+)$")
+    local subCmd = rawCmd and rawCmd:lower() or ""
+    local arg = rawArg and rawArg:trim() or ""
 
-    if cmd == "show" then
+    if subCmd == "set" then
+        local set = addon.ApplySetByName(arg)
+        if set then
+            if InCombatLockdown() then
+                print("|cFF00FF00TotemBuddy:|r Set '" .. set.name .. "' queued — applies when you leave combat")
+            else
+                print("|cFF00FF00TotemBuddy:|r Applied set: " .. set.name)
+            end
+        else
+            print("|cFFFF0000TotemBuddy:|r No set named '" .. arg .. "'. Use /tb sets to list.")
+        end
+    elseif subCmd == "saveset" then
+        local set, isNew = addon.SaveCurrentAsSet(arg)
+        if set then
+            print("|cFF00FF00TotemBuddy:|r " .. (isNew and "Saved" or "Updated") .. " set '" .. set.name .. "': " .. addon.DescribeSet(set))
+        else
+            print("|cFFFF0000TotemBuddy:|r Usage: /tb saveset <name>")
+        end
+    elseif subCmd == "delset" then
+        local removed = addon.DeleteSetByName(arg)
+        if removed then
+            print("|cFF00FF00TotemBuddy:|r Deleted set '" .. removed.name .. "'")
+        else
+            print("|cFFFF0000TotemBuddy:|r No set named '" .. arg .. "'. Use /tb sets to list.")
+        end
+    elseif cmd == "sets" then
+        local sets = addon.GetSets()
+        if #sets == 0 then
+            print("|cFF00FF00TotemBuddy:|r No sets saved. Use /tb saveset <name> to create one.")
+        else
+            print("|cFF00FF00TotemBuddy:|r Totem sets:")
+            for i, set in ipairs(sets) do
+                local marker = (TotemBuddyDB.activeSet == i) and " |cFF00FF00(active)|r" or ""
+                print("  " .. i .. ". " .. set.name .. marker .. " — " .. addon.DescribeSet(set))
+            end
+        end
+    elseif cmd == "show" then
         if addon.UI.actionBarFrame then
             if addon.UI.actionBarFrame:IsShown() then
                 addon.UI.actionBarFrame:Hide()
@@ -168,5 +210,9 @@ SlashCmdList["TOTEMBUDDY"] = function(msg)
         print("  /tb config - Open configuration window")
         print("  /tb popup up|down|left|right - Set popup direction")
         print("  /tb timers above|below|left|right - Set timer position")
+        print("  /tb sets - List saved totem sets")
+        print("  /tb saveset <name> - Save current totems as a named set")
+        print("  /tb set <name> - Apply a saved set")
+        print("  /tb delset <name> - Delete a saved set")
     end
 end
