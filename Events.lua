@@ -183,6 +183,12 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1, arg2, arg3)
             TotemBuddyDB.customMacros = {}
         end
 
+        -- Ensure named totem sets array exists (own table per saved-vars DB,
+        -- not the shared defaults reference)
+        if not TotemBuddyDB.sets then
+            TotemBuddyDB.sets = {}
+        end
+
         -- Ensure defaultMacrosEnabled has all keys
         if not TotemBuddyDB.defaultMacrosEnabled then
             TotemBuddyDB.defaultMacrosEnabled = {}

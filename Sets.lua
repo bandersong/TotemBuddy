@@ -1,0 +1,112 @@
+-- TotemBuddy: Sets Module
+-- Named totem sets: save the current four active totems as a named preset,
+-- list them, apply one, or delete one. Applying writes the set's totems into
+-- the active slots via addon.SetActiveTotem, which already handles combat
+-- lockdown (secure updates are queued and replayed on PLAYER_REGEN_ENABLED).
+
+local addonName, addon = ...
+
+-- Canonical element order for sets (independent of the user's display order)
+local SET_ELEMENTS = { "Earth", "Fire", "Water", "Air" }
+addon.SET_ELEMENTS = SET_ELEMENTS
+
+-- Ensure the sets array exists and return it
+local function EnsureSets()
+    if not TotemBuddyDB.sets then TotemBuddyDB.sets = {} end
+    return TotemBuddyDB.sets
+end
+
+-- Find a set index by case-insensitive name; returns index or nil
+local function FindSetIndex(name)
+    if not name or name == "" then return nil end
+    local target = name:lower()
+    for i, set in ipairs(EnsureSets()) do
+        if set.name and set.name:lower() == target then
+            return i
+        end
+    end
+    return nil
+end
+addon.FindSetIndex = FindSetIndex
+
+-- Return the sets array
+function addon.GetSets()
+    return EnsureSets()
+end
+
+-- Save the current active totems as a named set.
+-- Overwrites an existing set with the same name (case-insensitive).
+-- Returns: set table, isNew (boolean) -- or nil if the name is blank.
+function addon.SaveCurrentAsSet(name)
+    name = name and name:trim() or ""
+    if name == "" then return nil, false end
+
+    local set = { name = name }
+    for _, element in ipairs(SET_ELEMENTS) do
+        set[element] = TotemBuddyDB["active" .. element]
+    end
+
+    local sets = EnsureSets()
+    local existing = FindSetIndex(name)
+    if existing then
+        set.name = sets[existing].name -- preserve original capitalization
+        sets[existing] = set
+        return set, false
+    end
+
+    table.insert(sets, set)
+    return set, true
+end
+
+-- Apply a set by index: write its totems into the active slots.
+-- Reuses addon.SetActiveTotem (queues secure updates if in combat).
+-- Returns: set table or nil.
+function addon.ApplySetByIndex(index)
+    local set = EnsureSets()[index]
+    if not set then return nil end
+
+    for _, element in ipairs(SET_ELEMENTS) do
+        local spellID = set[element]
+        if spellID then
+            addon.SetActiveTotem(element, spellID)
+        end
+    end
+    TotemBuddyDB.activeSet = index
+    return set
+end
+
+-- Apply a set by name (case-insensitive). Returns set or nil.
+function addon.ApplySetByName(name)
+    local index = FindSetIndex(name)
+    if not index then return nil end
+    return addon.ApplySetByIndex(index)
+end
+
+-- Delete a set by name (case-insensitive). Returns the removed set or nil.
+function addon.DeleteSetByName(name)
+    local index = FindSetIndex(name)
+    if not index then return nil end
+
+    local sets = EnsureSets()
+    local removed = table.remove(sets, index)
+
+    -- Keep activeSet pointing at the right entry after the shift
+    if TotemBuddyDB.activeSet == index then
+        TotemBuddyDB.activeSet = nil
+    elseif TotemBuddyDB.activeSet and TotemBuddyDB.activeSet > index then
+        TotemBuddyDB.activeSet = TotemBuddyDB.activeSet - 1
+    end
+    return removed
+end
+
+-- Human-readable summary of a set's totems, e.g.
+-- "Earth: Tremor Totem, Fire: Searing Totem, Water: Mana Spring Totem, Air: ..."
+function addon.DescribeSet(set)
+    local parts = {}
+    for _, element in ipairs(SET_ELEMENTS) do
+        local spellID = set[element]
+        local name = spellID and addon.GetTotemName(spellID) or nil
+        table.insert(parts, element .. ": " .. (name or "\226\128\148")) -- em dash
+    end
+    return table.concat(parts, ", ")
+end

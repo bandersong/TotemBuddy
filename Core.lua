@@ -50,6 +50,8 @@ addon.defaults = {
         Air = 8959,
     },
     customMacros = {}, -- User-defined macros with template placeholders
+    sets = {}, -- Named totem sets: { { name=, Earth=, Fire=, Water=, Air= }, ... }
+    activeSet = nil, -- Index of the most recently applied set (display only)
     defaultMacrosEnabled = { -- Toggle default macros on/off
         TBEarth = true,
         TBFire = true,
