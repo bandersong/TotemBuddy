@@ -150,6 +150,16 @@ SlashCmdList["TOTEMBUDDY"] = function(msg)
                 print("  " .. i .. ". " .. set.name .. marker .. " — " .. addon.DescribeSet(set))
             end
         end
+    elseif subCmd == "quick" then
+        if arg:lower() == "config" then
+            addon.ToggleQuickConfig()
+        else
+            local shown = addon.ToggleQuickBar()
+            print("|cFF00FF00TotemBuddy:|r Quick-react bar " .. (shown and "shown" or "hidden"))
+        end
+    elseif cmd == "quick" then
+        local shown = addon.ToggleQuickBar()
+        print("|cFF00FF00TotemBuddy:|r Quick-react bar " .. (shown and "shown" or "hidden"))
     elseif cmd == "show" then
         if addon.UI.actionBarFrame then
             if addon.UI.actionBarFrame:IsShown() then
@@ -217,5 +227,7 @@ SlashCmdList["TOTEMBUDDY"] = function(msg)
         print("  /tb saveset <name> - Save current totems as a named set")
         print("  /tb set <name> - Apply a saved set")
         print("  /tb delset <name> - Delete a saved set")
+        print("  /tb quick - Toggle the quick-react utility bar")
+        print("  /tb quick config - Open the quick-react bar settings")
     end
 end

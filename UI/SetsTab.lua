@@ -76,8 +76,9 @@ local function Refresh()
 
     for i, set in ipairs(sets) do
         local row = CreateFrame("Frame", nil, tab.list)
-        row:SetSize(tab.list:GetWidth(), ROW_HEIGHT)
+        row:SetHeight(ROW_HEIGHT)
         row:SetPoint("TOPLEFT", tab.list, "TOPLEFT", 0, -(i - 1) * ROW_HEIGHT)
+        row:SetPoint("TOPRIGHT", tab.list, "TOPRIGHT", 0, -(i - 1) * ROW_HEIGHT)
 
         -- Action buttons (top line), anchored from the right edge inward
         local delBtn = RowButton(row, "Del", 40)
