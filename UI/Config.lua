@@ -407,6 +407,7 @@ function addon.CreateConfigWindow()
     CreateTab("ordering", "Totem Order", 120)
     CreateTab("sounds", "Sounds", 225)
     CreateTab("macros", "Macros", 330)
+    CreateTab("sets", "Sets", 435)
 
     local contentFrame = CreateFrame("Frame", nil, frame)
     contentFrame:SetPoint("TOPLEFT", 15, -65)
@@ -1526,6 +1527,13 @@ function addon.CreateConfigWindow()
 
     frame.sections = sections
     frame.tabContent = tabContent
+
+    -- Sets tab content (built in UI/SetsTab.lua)
+    local setsContent = CreateFrame("Frame", nil, contentFrame)
+    setsContent:SetAllPoints()
+    tabContent["sets"] = setsContent
+    addon.BuildSetsTab(setsContent)
+
     frame:Hide()
 
     SelectTab("layout")

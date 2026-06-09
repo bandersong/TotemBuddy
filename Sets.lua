@@ -99,6 +99,36 @@ function addon.DeleteSetByName(name)
     return removed
 end
 
+-- Rename a set by index. Returns true, or false + reason string.
+function addon.RenameSet(index, newName)
+    newName = newName and newName:trim() or ""
+    local set = EnsureSets()[index]
+    if not set then return false, "no such set" end
+    if newName == "" then return false, "name required" end
+    local clash = FindSetIndex(newName)
+    if clash and clash ~= index then
+        return false, "a set named '" .. newName .. "' already exists"
+    end
+    set.name = newName
+    return true
+end
+
+-- Move a set up (delta -1) or down (delta +1), swapping with its neighbor.
+-- Keeps activeSet pointing at the same entries. Returns the new index or nil.
+function addon.MoveSet(index, delta)
+    local sets = EnsureSets()
+    local target = index + delta
+    if not sets[index] or not sets[target] then return nil end
+
+    sets[index], sets[target] = sets[target], sets[index]
+    if TotemBuddyDB.activeSet == index then
+        TotemBuddyDB.activeSet = target
+    elseif TotemBuddyDB.activeSet == target then
+        TotemBuddyDB.activeSet = index
+    end
+    return target
+end
+
 -- Human-readable summary of a set's totems, e.g.
 -- "Earth: Tremor Totem, Fire: Searing Totem, Water: Mana Spring Totem, Air: ..."
 function addon.DescribeSet(set)

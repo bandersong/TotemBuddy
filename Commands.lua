@@ -122,6 +122,7 @@ SlashCmdList["TOTEMBUDDY"] = function(msg)
         else
             print("|cFFFF0000TotemBuddy:|r No set named '" .. arg .. "'. Use /tb sets to list.")
         end
+        if addon.RefreshSetsTab then addon.RefreshSetsTab() end
     elseif subCmd == "saveset" then
         local set, isNew = addon.SaveCurrentAsSet(arg)
         if set then
@@ -129,6 +130,7 @@ SlashCmdList["TOTEMBUDDY"] = function(msg)
         else
             print("|cFFFF0000TotemBuddy:|r Usage: /tb saveset <name>")
         end
+        if addon.RefreshSetsTab then addon.RefreshSetsTab() end
     elseif subCmd == "delset" then
         local removed = addon.DeleteSetByName(arg)
         if removed then
@@ -136,6 +138,7 @@ SlashCmdList["TOTEMBUDDY"] = function(msg)
         else
             print("|cFFFF0000TotemBuddy:|r No set named '" .. arg .. "'. Use /tb sets to list.")
         end
+        if addon.RefreshSetsTab then addon.RefreshSetsTab() end
     elseif cmd == "sets" then
         local sets = addon.GetSets()
         if #sets == 0 then
