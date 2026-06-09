@@ -48,14 +48,19 @@ function addon.SaveCurrentAsSet(name)
 
     local sets = EnsureSets()
     local existing = FindSetIndex(name)
+    local isNew
     if existing then
-        set.name = sets[existing].name -- preserve original capitalization
+        set.name = sets[existing].name       -- preserve original capitalization
+        set.keybind = sets[existing].keybind -- preserve the existing keybind
         sets[existing] = set
-        return set, false
+        isNew = false
+    else
+        table.insert(sets, set)
+        isNew = true
     end
 
-    table.insert(sets, set)
-    return set, true
+    if addon.NotifySetsChanged then addon.NotifySetsChanged() end
+    return set, isNew
 end
 
 -- Apply a set by index: write its totems into the active slots.
@@ -72,6 +77,7 @@ function addon.ApplySetByIndex(index)
         end
     end
     TotemBuddyDB.activeSet = index
+    if addon.RefreshSetsTab then addon.RefreshSetsTab() end
     return set
 end
 
@@ -96,6 +102,8 @@ function addon.DeleteSetByName(name)
     elseif TotemBuddyDB.activeSet and TotemBuddyDB.activeSet > index then
         TotemBuddyDB.activeSet = TotemBuddyDB.activeSet - 1
     end
+
+    if addon.NotifySetsChanged then addon.NotifySetsChanged() end
     return removed
 end
 
@@ -110,6 +118,7 @@ function addon.RenameSet(index, newName)
         return false, "a set named '" .. newName .. "' already exists"
     end
     set.name = newName
+    if addon.NotifySetsChanged then addon.NotifySetsChanged() end
     return true
 end
 
@@ -126,6 +135,8 @@ function addon.MoveSet(index, delta)
     elseif TotemBuddyDB.activeSet == target then
         TotemBuddyDB.activeSet = index
     end
+
+    if addon.NotifySetsChanged then addon.NotifySetsChanged() end
     return target
 end
 

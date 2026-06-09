@@ -220,6 +220,7 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1, arg2, arg3)
         -- Create macros after a short delay (needs UI to be ready)
         C_Timer.After(2, function()
             addon.CreateTotemMacros()
+            if addon.RefreshSetBindings then addon.RefreshSetBindings() end
         end)
 
     elseif event == "PLAYER_TOTEM_UPDATE" then
@@ -274,6 +275,11 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1, arg2, arg3)
         addon.state.pendingActiveUpdates = {}
         -- Also update custom macros (in case active totems changed during combat)
         addon.UpdateCustomMacros()
+
+        -- Apply any set keybindings/macros that were deferred during combat
+        if addon.ApplyPendingSetBindings then
+            addon.ApplyPendingSetBindings()
+        end
 
         -- Restore proper popup state after combat
         -- During combat, mouse was enabled for alpha-based visibility; now properly hide if needed
