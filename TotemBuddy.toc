@@ -17,5 +17,6 @@ UI/Reincarnation.lua
 UI/WeaponBuff.lua
 UI/Config.lua
 UI/SetsTab.lua
+UI/QuickBar.lua
 Events.lua
 Commands.lua

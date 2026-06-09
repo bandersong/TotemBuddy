@@ -189,6 +189,19 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1, arg2, arg3)
             TotemBuddyDB.sets = {}
         end
 
+        -- Quick-react bar: ensure each DB owns its tables rather than sharing
+        -- the defaults reference (the generic copy above assigns the reference,
+        -- which would otherwise bleed between characters in one session).
+        if not TotemBuddyDB.quickReact or TotemBuddyDB.quickReact == defaults.quickReact then
+            TotemBuddyDB.quickReact = { 8177, 8143, 8166, 8170, 2484 }
+        end
+        if not TotemBuddyDB.quickReactKeybinds or TotemBuddyDB.quickReactKeybinds == defaults.quickReactKeybinds then
+            TotemBuddyDB.quickReactKeybinds = {}
+        end
+        if not TotemBuddyDB.quickReactPos or TotemBuddyDB.quickReactPos == defaults.quickReactPos then
+            TotemBuddyDB.quickReactPos = { point = "CENTER", x = 0, y = -260 }
+        end
+
         -- Ensure defaultMacrosEnabled has all keys
         if not TotemBuddyDB.defaultMacrosEnabled then
             TotemBuddyDB.defaultMacrosEnabled = {}
@@ -221,6 +234,7 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1, arg2, arg3)
         C_Timer.After(2, function()
             addon.CreateTotemMacros()
             if addon.RefreshSetBindings then addon.RefreshSetBindings() end
+            if addon.CreateQuickBar then addon.CreateQuickBar() end
         end)
 
     elseif event == "PLAYER_TOTEM_UPDATE" then
@@ -279,6 +293,9 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1, arg2, arg3)
         -- Apply any set keybindings/macros that were deferred during combat
         if addon.ApplyPendingSetBindings then
             addon.ApplyPendingSetBindings()
+        end
+        if addon.ApplyPendingQuick then
+            addon.ApplyPendingQuick()
         end
 
         -- Restore proper popup state after combat

@@ -52,6 +52,10 @@ addon.defaults = {
     customMacros = {}, -- User-defined macros with template placeholders
     sets = {}, -- Named totem sets: { { name=, Earth=, Fire=, Water=, Air= }, ... }
     activeSet = nil, -- Index of the most recently applied set (display only)
+    quickReactEnabled = false, -- Show the quick-react utility totem bar
+    quickReact = { 8177, 8143, 8166, 8170, 2484 }, -- spellIDs: Grounding, Tremor, Poison Cleansing, Disease Cleansing, Earthbind
+    quickReactKeybinds = {}, -- map spellID -> keybind chord string
+    quickReactPos = { point = "CENTER", x = 0, y = -260 },
     defaultMacrosEnabled = { -- Toggle default macros on/off
         TBEarth = true,
         TBFire = true,
