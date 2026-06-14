@@ -142,8 +142,8 @@ local function EnsureQuickButton(i)
     if quickButtons[i] then return quickButtons[i] end
     local btn = CreateFrame("Button", "TotemBuddyQuickButton" .. i, quickBar, "SecureActionButtonTemplate")
     btn:SetSize(BTN_SIZE, BTN_SIZE)
-    btn:SetAttribute("type", "macro")
-    btn:RegisterForClicks("AnyUp")
+    btn:SetAttribute("type", "spell")
+    btn:RegisterForClicks("AnyDown", "AnyUp")
 
     btn.icon = btn:CreateTexture(nil, "ARTWORK")
     btn.icon:SetAllPoints()
@@ -187,7 +187,7 @@ function addon.RefreshQuickBar()
         local btn = EnsureQuickButton(i)
         btn.spellID = spellID
         local name = addon.GetTotemName(spellID)
-        btn:SetAttribute("macrotext", "#showtooltip\n/cast " .. (name or ""))
+        btn:SetAttribute("spell", name)
         local icon = addon.GetTotemIcon(spellID)
         if icon then btn.icon:SetTexture(icon) end
         btn:ClearAllPoints()
