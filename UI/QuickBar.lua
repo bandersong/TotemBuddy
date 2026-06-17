@@ -153,10 +153,32 @@ local function EnsureQuickButton(i)
         if self.spellID then
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
             GameTooltip:SetSpellByID(self.spellID)
+            local chord = GetKeybinds()[self.spellID]
+            GameTooltip:AddLine(chord and ("Bound: " .. chord) or "Right-click to set keybind", 0.7, 0.7, 0.7)
             GameTooltip:Show()
         end
     end)
     btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    btn:SetScript("OnClick", function(self, clickButton)
+        if clickButton == "RightButton" and not InCombatLockdown() then
+            local sid = self.spellID
+            if not sid then return end
+            local name = addon.GetTotemName(sid)
+            local chord = GetKeybinds()[sid]
+            print("|cFF00FF00TotemBuddy:|r " .. (name or "Totem")
+                .. (chord and " (current: " .. chord .. ")" or "")
+                .. " — press a key to bind, Escape to clear")
+            addon.CaptureKeybind(self, function(newChord)
+                addon.SetQuickKeybind(sid, newChord)
+                if newChord then
+                    print("|cFF00FF00TotemBuddy:|r Bound " .. (name or "Totem") .. " \226\134\146 " .. newChord)
+                else
+                    print("|cFF00FF00TotemBuddy:|r Cleared keybind for " .. (name or "Totem"))
+                end
+            end)
+        end
+    end)
 
     quickButtons[i] = btn
     return btn
