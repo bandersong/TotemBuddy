@@ -149,6 +149,12 @@ local function EnsureQuickButton(i)
     btn.icon:SetAllPoints()
     btn.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 
+    local cd = CreateFrame("Cooldown", nil, btn, "CooldownFrameTemplate")
+    cd:SetAllPoints(btn.icon)
+    cd:SetSwipeColor(0, 0, 0, 0.8)
+    cd:SetDrawEdge(false)
+    btn.cooldown = cd
+
     btn:SetScript("OnEnter", function(self)
         if self.spellID then
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -234,6 +240,21 @@ function addon.RefreshQuickBar()
     else
         quickBar:SetSize(PAD * 2 + n * BTN_SIZE + (n - 1) * BTN_GAP, BTN_SIZE + PAD * 2)
         quickBar:Show()
+    end
+
+    addon.UpdateQuickBarCooldowns()
+end
+
+function addon.UpdateQuickBarCooldowns()
+    for _, btn in ipairs(quickButtons) do
+        if btn:IsShown() and btn.spellID and btn.cooldown then
+            local start, duration, enable = GetSpellCooldown(btn.spellID)
+            if enable == 1 and duration > 1.5 then
+                btn.cooldown:SetCooldown(start, duration)
+            else
+                btn.cooldown:SetCooldown(0, 0)
+            end
+        end
     end
 end
 
@@ -387,16 +408,28 @@ function addon.RefreshQuickConfig()
         removeBtn:SetText("Remove")
         removeBtn:SetScript("OnClick", function() addon.RemoveQuickTotem(spellID) end)
 
+        local currentChord = keybinds[spellID]
+
         local bindBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
         bindBtn:SetSize(74, 20)
         bindBtn:SetPoint("RIGHT", removeBtn, "LEFT", -4, 0)
-        bindBtn:SetText(keybinds[spellID] or "Bind")
+        bindBtn:SetText(currentChord or "Set key")
         bindBtn:SetScript("OnClick", function(self)
             self:SetText("press key…")
             addon.CaptureKeybind(self, function(chord)
                 addon.SetQuickKeybind(spellID, chord)
             end)
         end)
+
+        if currentChord then
+            local clearBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+            clearBtn:SetSize(22, 20)
+            clearBtn:SetPoint("RIGHT", bindBtn, "LEFT", -2, 0)
+            clearBtn:SetText("x")
+            clearBtn:SetScript("OnClick", function()
+                addon.SetQuickKeybind(spellID, nil)
+            end)
+        end
 
         table.insert(frame.rows, row)
     end

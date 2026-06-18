@@ -335,6 +335,7 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1, arg2, arg3)
     elseif event == "SPELL_UPDATE_COOLDOWN" then
         -- Update Reincarnation cooldown display
         addon.UpdateReincarnationButton()
+        if addon.UpdateQuickBarCooldowns then addon.UpdateQuickBarCooldowns() end
 
     elseif event == "UNIT_AURA" then
         -- Update totem dimming when player buffs change (for out-of-range detection)
