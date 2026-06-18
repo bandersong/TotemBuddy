@@ -160,7 +160,7 @@ local function EnsureQuickButton(i)
     end)
     btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-    btn:SetScript("OnClick", function(self, clickButton)
+    btn:HookScript("PostClick", function(self, clickButton)
         if clickButton == "RightButton" and not InCombatLockdown() then
             local sid = self.spellID
             if not sid then return end
