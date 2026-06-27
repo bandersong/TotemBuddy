@@ -108,8 +108,19 @@ local function EnsureTracker(i)
     t.countText:SetPoint("BOTTOMRIGHT", t, "BOTTOMRIGHT", -2, 2)
     t.countText:SetTextColor(1, 1, 1)
 
-    -- Hover tooltip (uses spec set in RefreshCooldownBar)
+    -- Hover tooltip and drag forwarding to the bar
     t:EnableMouse(true)
+    t:RegisterForDrag("LeftButton")
+    t:SetScript("OnDragStart", function()
+        if not TotemBuddyDB.cooldownBarLocked and not InCombatLockdown() then
+            bar:StartMoving()
+        end
+    end)
+    t:SetScript("OnDragStop", function()
+        bar:StopMovingOrSizing()
+        local point, _, _, x, y = bar:GetPoint()
+        TotemBuddyDB.cooldownBarPos = { point = point, x = x, y = y }
+    end)
     t:SetScript("OnEnter", function(self)
         if TotemBuddyDB.showTooltips == false or not self.spec then return end
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
