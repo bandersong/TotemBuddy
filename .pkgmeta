@@ -1,0 +1,15 @@
+# BigWigs packager config (https://github.com/BigWigsMods/packager)
+# Used by the GitHub Action to build the CurseForge/WoWInterface/Wago zip on tag.
+package-as: TotemBuddy
+
+enable-nolib-creation: no
+
+# Use our hand-written changelog as the release notes.
+manual-changelog: CHANGELOG.md
+
+# Dev-only files that should not ship inside the addon zip.
+ignore:
+  - .github
+  - .pkgmeta
+  - DESIGN.md
+  - "*.zip"

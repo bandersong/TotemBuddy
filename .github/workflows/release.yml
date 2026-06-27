@@ -1,0 +1,39 @@
+name: Package and release
+
+# Builds the addon zip and uploads it to CurseForge (and GitHub Releases) whenever
+# you push a version tag, e.g.:
+#   git tag v2.1.0 && git push origin v2.1.0
+#
+# REQUIRED ONE-TIME SETUP before a tag will reach CurseForge:
+#   1. Create the project on CurseForge (Upload a project -> WoW -> Classic).
+#   2. Copy its numeric "Project ID" into TotemBuddy.toc as:
+#        ## X-Curse-Project-ID: 123456
+#   3. Make a CurseForge API token (curseforge.com -> Account -> API Tokens)
+#      and add it to this repo as a secret named CF_API_KEY
+#      (Settings -> Secrets and variables -> Actions -> New repository secret).
+#
+# Without the project ID + CF_API_KEY the action still runs and attaches the zip
+# to a GitHub Release; it just skips the CurseForge upload.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Package and upload
+        uses: BigWigsMods/packager@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}

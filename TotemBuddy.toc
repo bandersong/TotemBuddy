@@ -5,6 +5,8 @@
 ## Author: bandersong
 ## Version: 2.1.0
 ## SavedVariables: TotemBuddyDB
+# After creating the CurseForge project, change the line below to "## X-Curse-Project-ID: <id>"
+# X-Curse-Project-ID: 000000
 
 Core.lua
 Macros.lua
