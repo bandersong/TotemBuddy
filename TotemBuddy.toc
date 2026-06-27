@@ -3,10 +3,9 @@
 ## Title: TotemBuddy
 ## Notes: Resto-shaman totem sets you can save and swap (with keybinds for in-combat switching), a quick-react utility bar, Earth/Lightning Shield trackers, plus one-click casting, hover popups, timers, weapon buffs, and Ankh tracking.
 ## Author: bandersong
-## Version: 2.1.0
+## Version: 2.2.0
 ## SavedVariables: TotemBuddyDB
-# After creating the CurseForge project, change the line below to "## X-Curse-Project-ID: <id>"
-# X-Curse-Project-ID: 000000
+## X-Curse-Project-ID: 1575703
 
 Core.lua
 Macros.lua

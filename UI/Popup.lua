@@ -53,8 +53,8 @@ function addon.CreatePopupButton(parent, totemData, element, index)
     btn.totemDuration = totemData.duration
     btn.element = element
 
-    -- Register for clicks
-    btn:RegisterForClicks("AnyDown", "AnyUp")
+    -- AnyDown only — AnyDown+AnyUp fires PostClick twice per click (once on press, once on release).
+    btn:RegisterForClicks("AnyDown")
 
     -- Left click = cast by name so WoW auto-selects highest trained rank
     btn:SetAttribute("type1", "spell")

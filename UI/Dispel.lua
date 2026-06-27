@@ -93,6 +93,17 @@ local function EnsureDispelButton(def)
     local btn = CreateFrame("Button", "TotemBuddyDispel_" .. def.key, dispelBar, "SecureActionButtonTemplate")
     btn:SetSize(BTN_SIZE, BTN_SIZE)
     btn:RegisterForClicks("AnyDown")
+    btn:RegisterForDrag("LeftButton")
+    btn:SetScript("OnDragStart", function(self)
+        if not TotemBuddyDB.dispelLocked and not InCombatLockdown() then
+            dispelBar:StartMoving()
+        end
+    end)
+    btn:SetScript("OnDragStop", function(self)
+        dispelBar:StopMovingOrSizing()
+        local point, _, _, x, y = dispelBar:GetPoint()
+        TotemBuddyDB.dispelPos = { point = point, x = x, y = y }
+    end)
 
     btn.icon = btn:CreateTexture(nil, "ARTWORK")
     btn.icon:SetPoint("TOPLEFT", 2, -2)
@@ -115,7 +126,7 @@ local function EnsureDispelButton(def)
             GameTooltip:AddLine(" ")
             GameTooltip:AddLine("Cast on: " .. (TotemBuddyDB.dispelTargetMode or "smart"), 0.6, 0.8, 0.6)
             local chord = GetDispelKeybinds()[def.key]
-            GameTooltip:AddLine(chord and ("Bound: " .. chord) or "Right-click to set keybind", 0.7, 0.7, 0.7)
+            GameTooltip:AddLine(chord and ("Bound: " .. chord) or "Right-click for keybind options", 0.7, 0.7, 0.7)
             GameTooltip:Show()
         end
     end)
@@ -127,15 +138,20 @@ local function EnsureDispelButton(def)
     btn:HookScript("PostClick", function(self, clickButton)
         if clickButton == "RightButton" and not InCombatLockdown() then
             local name = addon.GetTotemName(def.spellID)
-            print("|cFF00FF00TotemBuddy:|r " .. (name or def.key) .. " — press a key to bind, Escape to clear")
-            addon.CaptureKeybind(self, function(chord)
-                if chord and addon.WarnKeybindConflict then
-                    addon.WarnKeybindConflict(chord, "Dispel: " .. (name or def.key))
+            local chord = GetDispelKeybinds()[def.key]
+            addon.ShowKeybindMenu(self, name, chord,
+                function()
+                    addon.ShowKeybindCapture(self, name, function(newChord)
+                        if newChord and addon.WarnKeybindConflict then
+                            addon.WarnKeybindConflict(newChord, "Dispel: " .. (name or def.key))
+                        end
+                        addon.SetDispelKeybind(def.key, newChord)
+                    end)
+                end,
+                function()
+                    addon.SetDispelKeybind(def.key, nil)
                 end
-                addon.SetDispelKeybind(def.key, chord)
-                print("|cFF00FF00TotemBuddy:|r " .. (chord and ("Bound " .. (name or def.key) .. " \226\134\146 " .. chord)
-                    or ("Cleared keybind for " .. (name or def.key))))
-            end)
+            )
         end
     end)
 

@@ -76,7 +76,8 @@ addon.defaults = {
     cooldownBarScale = 1.0,
     cooldownBarLocked = false,
     cooldownTrackTrinkets = true, -- track equipped trinket (slots 13/14) cooldowns
-    showHealingWay = true,        -- track your Healing Way stacks on focus/target
+    showHealingWay = true,          -- track your Healing Way stacks on focus/target
+    showAncestralHealing = true,    -- track the Ancestral Healing proc on focus/target
     nsGlowEnabled = true,         -- Nature's Swiftness active screen glow
     -- Dispel bar (Cure Disease / Cure Poison, smart mouseover cast)
     showDispelBar = true,
@@ -248,9 +249,10 @@ for _, s in ipairs(addon.SHIELDS) do
 end
 
 -- Key resto cooldowns / procs (spell IDs are rank-independent for our needs)
-addon.NS_SPELL = 16188          -- Nature's Swiftness
-addon.MANA_TIDE_SPELL = 16190   -- Mana Tide Totem
-addon.HEALING_WAY_BUFF = 29203  -- Healing Way (buff Healing Wave puts on the target)
+addon.NS_SPELL = 16188              -- Nature's Swiftness
+addon.MANA_TIDE_SPELL = 16190       -- Mana Tide Totem
+addon.HEALING_WAY_BUFF = 29203      -- Healing Way (buff Healing Wave puts on the target)
+addon.ANCESTRAL_HEALING_BUFF = 16236 -- Ancestral Healing proc (critical heal → 25% phys dmg reduction on target)
 
 -- Dispels: Cure Disease / Cure Poison, smart friendly-target cast buttons.
 addon.DISPELS = {
@@ -264,11 +266,12 @@ end
 
 -- Shared aura scan: find a buff by (rank-independent) localized name on `unit`.
 -- Pass filter "PLAYER" to only see auras YOU cast. Returns count, duration,
--- expiration (TBC UnitBuff tuple: count=4, duration=6, expirationTime=7) or nil.
+-- expiration (TBC Anniversary 2.5.x UnitBuff: name, icon, count, debuffType,
+-- duration, expirationTime -- rank field was removed in the 2.5.x client) or nil.
 function addon.ScanUnitAura(unit, name, filter)
     if not unit or not name or not UnitExists(unit) then return nil end
     for i = 1, 40 do
-        local n, _, _, count, _, duration, expiration = UnitBuff(unit, i, filter)
+        local n, _, count, _, duration, expiration = UnitBuff(unit, i, filter)
         if not n then break end
         if n == name then
             return count or 0, duration or 0, expiration or 0

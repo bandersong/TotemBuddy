@@ -22,6 +22,7 @@ local BTN_SIZE = 40
 local BTN_GAP = 4
 local PAD = 6
 local SCAN_THROTTLE = 0.25 -- seconds between Earth Shield group rescans
+local NAME_H = 14           -- extra bar height below buttons for Earth Shield target name
 
 local shieldOwner = CreateFrame("Frame", "TotemBuddyShieldOwner", UIParent)
 local shieldButtons = {}   -- key -> button
@@ -91,9 +92,9 @@ end
 local function ScanUnit(unit, name)
     if not UnitExists(unit) then return nil end
     for i = 1, 40 do
-        -- TBC Classic UnitBuff: name, rank, icon, count, debuffType, duration,
-        -- expirationTime, source, ... , spellId. "PLAYER" filter = only mine.
-        local n, _, _, count, _, duration, expiration = UnitBuff(unit, i, "PLAYER")
+        -- TBC Anniversary 2.5.x UnitBuff: name, icon, count, debuffType, duration,
+        -- expirationTime, source (rank removed in 2.5.x). "PLAYER" filter = only mine.
+        local n, _, count, _, duration, expiration = UnitBuff(unit, i, "PLAYER")
         if not n then break end
         if n == name then
             return count or 0, duration or 0, expiration or 0
@@ -107,27 +108,27 @@ local function FindLightningShield(name)
     return ScanUnit("player", name)
 end
 
--- Find MY Earth Shield across likely units. Order favours the unit you most
--- likely shielded (focus/target tank), then yourself, then the group.
+-- Find MY Earth Shield across likely units. Returns count, duration, expiration,
+-- and the unit token that has the shield (e.g. "focus", "raid3", "player").
 local function FindEarthShield(name)
-    local count, duration, expiration = ScanUnit("focus", name)
-    if count then return count, duration, expiration end
-    count, duration, expiration = ScanUnit("target", name)
-    if count then return count, duration, expiration end
-    count, duration, expiration = ScanUnit("mouseover", name)
-    if count then return count, duration, expiration end
-    count, duration, expiration = ScanUnit("player", name)
-    if count then return count, duration, expiration end
-
+    local function tryUnit(unit)
+        local c, d, e = ScanUnit(unit, name)
+        if c then return c, d, e, unit end
+    end
+    local c, d, e, u
+    for _, unit in ipairs({"focus", "target", "mouseover", "player"}) do
+        c, d, e, u = tryUnit(unit)
+        if c then return c, d, e, u end
+    end
     if IsInRaid() then
         for i = 1, 40 do
-            count, duration, expiration = ScanUnit("raid" .. i, name)
-            if count then return count, duration, expiration end
+            c, d, e, u = tryUnit("raid" .. i)
+            if c then return c, d, e, u end
         end
     elseif IsInGroup() then
         for i = 1, 4 do
-            count, duration, expiration = ScanUnit("party" .. i, name)
-            if count then return count, duration, expiration end
+            c, d, e, u = tryUnit("party" .. i)
+            if c then return c, d, e, u end
         end
     end
     return nil
@@ -144,12 +145,12 @@ function addon.RescanShields(force)
                     local now = GetTime()
                     if force or (now - lastEarthScan) >= SCAN_THROTTLE then
                         lastEarthScan = now
-                        local c, d, e = FindEarthShield(name)
-                        shieldState.earth = c and { count = c, duration = d, expiration = e } or nil
+                        local c, d, e, u = FindEarthShield(name)
+                        shieldState.earth = (c and c > 0) and { count = c, duration = d, expiration = e, targetUnit = u } or nil
                     end
                 else
                     local c, d, e = FindLightningShield(name)
-                    shieldState[def.key] = c and { count = c, duration = d, expiration = e } or nil
+                    shieldState[def.key] = (c and c > 0) and { count = c, duration = d, expiration = e } or nil
                 end
             end
         else
@@ -165,6 +166,19 @@ local function UpdateShieldButtonDisplay(def, btn)
     local st = shieldState[def.key]
     local now = GetTime()
 
+    -- Earth Shield: show the target's name below the button, class-colored.
+    if btn.nameLabel then
+        if st and st.targetUnit and UnitExists(st.targetUnit) then
+            local uname = UnitName(st.targetUnit) or ""
+            local _, class = UnitClass(st.targetUnit)
+            local cc = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
+            btn.nameLabel:SetTextColor(cc and cc.r or 0.9, cc and cc.g or 0.9, cc and cc.b or 0.9)
+            btn.nameLabel:SetText(uname)
+        else
+            btn.nameLabel:SetText("")
+        end
+    end
+
     -- Expired? drop the cache so it reads as missing.
     if st and st.expiration and st.expiration > 0 and (st.expiration - now) <= 0 then
         shieldState[def.key] = nil
@@ -179,7 +193,7 @@ local function UpdateShieldButtonDisplay(def, btn)
         -- Charges
         local warn = TotemBuddyDB.shieldLowChargeWarn or 0
         local low = warn > 0 and st.count and st.count <= warn and st.count > 0
-        btn.countText:SetText(st.count and st.count > 0 and st.count or "")
+        btn.countText:SetText((st.count and st.count > 0) and tostring(st.count) or "")
         if low then
             btn.countText:SetTextColor(1, 0.3, 0.3)
         else
@@ -266,6 +280,17 @@ local function EnsureShieldButton(def)
     btn:SetSize(BTN_SIZE, BTN_SIZE)
     -- AnyDown only (cast on press, once) — see QuickBar for why AnyUp is dropped.
     btn:RegisterForClicks("AnyDown")
+    btn:RegisterForDrag("LeftButton")
+    btn:SetScript("OnDragStart", function(self)
+        if not TotemBuddyDB.shieldsLocked and not InCombatLockdown() then
+            shieldBar:StartMoving()
+        end
+    end)
+    btn:SetScript("OnDragStop", function(self)
+        shieldBar:StopMovingOrSizing()
+        local point, _, _, x, y = shieldBar:GetPoint()
+        TotemBuddyDB.shieldsPos = { point = point, x = x, y = y }
+    end)
 
     btn.icon = btn:CreateTexture(nil, "ARTWORK")
     btn.icon:SetPoint("TOPLEFT", 2, -2)
@@ -280,28 +305,45 @@ local function EnsureShieldButton(def)
     btn.border:SetBackdropBorderColor(def.color.r, def.color.g, def.color.b, 1)
     btn.border:EnableMouse(false)
 
-    local cd = CreateFrame("Cooldown", nil, btn, "CooldownFrameTemplate")
-    cd:SetAllPoints(btn.icon)
+    local cd = CreateFrame("Cooldown", nil, btn)
+    cd:SetAllPoints(btn)
     cd:SetDrawEdge(false)
     cd:SetHideCountdownNumbers(true)
-    cd.noCooldownCount = true -- we draw our own time text
-    cd:EnableMouse(false)      -- don't let the swipe eat clicks to the cast button
+    cd:EnableMouse(false)
+    -- The Cooldown C++ type may create internal child frames (countdown wrapper).
+    -- Explicitly kill mouse on all of them so none intercept clicks.
+    for _, child in ipairs({cd:GetChildren()}) do
+        child:EnableMouse(false)
+    end
     btn.cooldown = cd
 
-    -- Text overlay above the cooldown swipe so it isn't dimmed
+    -- Text overlay above the cooldown swipe. EnableMouse(false) is REQUIRED —
+    -- in TBC Classic Anniversary the engine can leave Frame mouse-capture on,
+    -- which makes the overlay eat every click on the button.
     local overlay = CreateFrame("Frame", nil, btn)
     overlay:SetAllPoints()
     overlay:SetFrameLevel(btn:GetFrameLevel() + 10)
+    overlay:EnableMouse(false)
 
-    btn.countText = overlay:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+    btn.countText = overlay:CreateFontString(nil, "OVERLAY")
+    btn.countText:SetFont("Fonts\\FRIZQT__.TTF", 13, "OUTLINE")
     btn.countText:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -2, 2)
     btn.countText:SetTextColor(1, 1, 1)
 
-    btn.timeText = overlay:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
+    btn.timeText = overlay:CreateFontString(nil, "OVERLAY")
+    btn.timeText:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
     btn.timeText:SetPoint("TOP", btn, "TOP", 0, -2)
     btn.timeText:SetTextColor(1, 1, 1)
-    btn.timeText:SetShadowOffset(1, -1)
-    btn.timeText:SetShadowColor(0, 0, 0, 1)
+
+    -- Earth Shield target name label (rendered below the button within the extended bar)
+    if def.key == "earth" then
+        btn.nameLabel = overlay:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        btn.nameLabel:SetPoint("TOP", btn, "BOTTOM", 0, -2)
+        btn.nameLabel:SetWidth(BTN_SIZE + 16)
+        btn.nameLabel:SetJustifyH("CENTER")
+        btn.nameLabel:SetShadowOffset(1, -1)
+        btn.nameLabel:SetShadowColor(0, 0, 0, 1)
+    end
 
     btn:SetScript("OnEnter", function(self)
         self.border:SetBackdropBorderColor(1, 1, 1, 1)
@@ -310,10 +352,14 @@ local function EnsureShieldButton(def)
             GameTooltip:SetSpellByID(def.spellID)
             GameTooltip:AddLine(" ")
             if def.key == "earth" then
-                GameTooltip:AddLine("Target: " .. (TotemBuddyDB.earthShieldTargetMode or "smart"), 0.6, 0.8, 0.6)
+                local st = shieldState[def.key]
+                if st and st.targetUnit and UnitExists(st.targetUnit) then
+                    GameTooltip:AddLine("On: " .. (UnitName(st.targetUnit) or "?"), 0.9, 0.9, 0.9)
+                end
+                GameTooltip:AddLine("Cast mode: " .. (TotemBuddyDB.earthShieldTargetMode or "smart"), 0.6, 0.8, 0.6)
             end
             local chord = GetShieldKeybinds()[def.key]
-            GameTooltip:AddLine(chord and ("Bound: " .. chord) or "Right-click to set keybind", 0.7, 0.7, 0.7)
+            GameTooltip:AddLine(chord and ("Bound: " .. chord) or "Right-click for keybind options", 0.7, 0.7, 0.7)
             GameTooltip:Show()
         end
     end)
@@ -332,20 +378,19 @@ local function EnsureShieldButton(def)
         if clickButton == "RightButton" and not InCombatLockdown() then
             local name = addon.GetTotemName(def.spellID)
             local chord = GetShieldKeybinds()[def.key]
-            print("|cFF00FF00TotemBuddy:|r " .. (name or def.key)
-                .. (chord and " (current: " .. chord .. ")" or "")
-                .. " — press a key to bind, Escape to clear")
-            addon.CaptureKeybind(self, function(newChord)
-                if newChord then
-                    addon.WarnKeybindConflict(newChord, "Shield: " .. (name or def.key))
+            addon.ShowKeybindMenu(self, name, chord,
+                function()
+                    addon.ShowKeybindCapture(self, name, function(newChord)
+                        if newChord then
+                            addon.WarnKeybindConflict(newChord, "Shield: " .. (name or def.key))
+                        end
+                        addon.SetShieldKeybind(def.key, newChord)
+                    end)
+                end,
+                function()
+                    addon.SetShieldKeybind(def.key, nil)
                 end
-                addon.SetShieldKeybind(def.key, newChord)
-                if newChord then
-                    print("|cFF00FF00TotemBuddy:|r Bound " .. (name or def.key) .. " \226\134\146 " .. newChord)
-                else
-                    print("|cFF00FF00TotemBuddy:|r Cleared keybind for " .. (name or def.key))
-                end
-            end)
+            )
         end
     end)
 
@@ -382,7 +427,7 @@ function addon.RefreshShieldBar()
             end
 
             btn:ClearAllPoints()
-            btn:SetPoint("LEFT", shieldBar, "LEFT", PAD + shown * (BTN_SIZE + BTN_GAP), 0)
+            btn:SetPoint("TOPLEFT", shieldBar, "TOPLEFT", PAD + shown * (BTN_SIZE + BTN_GAP), -PAD)
             btn:Show()
             shown = shown + 1
 
@@ -399,7 +444,7 @@ function addon.RefreshShieldBar()
     if shown == 0 then
         shieldBar:Hide()
     else
-        shieldBar:SetSize(PAD * 2 + shown * BTN_SIZE + (shown - 1) * BTN_GAP, BTN_SIZE + PAD * 2)
+        shieldBar:SetSize(PAD * 2 + shown * BTN_SIZE + (shown - 1) * BTN_GAP, BTN_SIZE + PAD * 2 + NAME_H)
         shieldBar:Show()
     end
 

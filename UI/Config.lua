@@ -333,7 +333,7 @@ function addon.CreateConfigWindow()
     end
 
     local frame = CreateFrame("Frame", "TotemBuddyConfigWindow", UIParent, "BackdropTemplate")
-    frame:SetSize(560, 360)
+    frame:SetSize(660, 400)
     frame:SetPoint("CENTER")
     frame:SetFrameStrata("DIALOG")
     frame:SetMovable(true)
@@ -404,10 +404,11 @@ function addon.CreateConfigWindow()
     end
 
     CreateTab("layout", "Layout", 15)
-    CreateTab("ordering", "Totem Order", 120)
-    CreateTab("sounds", "Sounds", 225)
-    CreateTab("macros", "Macros", 330)
-    CreateTab("sets", "Sets", 435)
+    CreateTab("ordering", "Totem Order", 125)
+    CreateTab("sounds", "Sounds", 235)
+    CreateTab("macros", "Macros", 345)
+    CreateTab("bars", "Utility Bars", 455)
+    CreateTab("sets", "Sets", 565)
 
     local contentFrame = CreateFrame("Frame", nil, frame)
     contentFrame:SetPoint("TOPLEFT", 15, -65)
@@ -1527,6 +1528,149 @@ function addon.CreateConfigWindow()
 
     frame.sections = sections
     frame.tabContent = tabContent
+
+    --------------------------
+    -- UTILITY BARS TAB
+    --------------------------
+    local barsContent = CreateFrame("Frame", nil, contentFrame)
+    barsContent:SetAllPoints()
+    tabContent["bars"] = barsContent
+
+    local function CreateBarSection(parent, title, yOffset, color)
+        local s = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+        s:SetSize(610, 72)
+        s:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, yOffset)
+        s:SetBackdrop({
+            bgFile = "Interface\\Buttons\\WHITE8x8",
+            edgeFile = "Interface\\Buttons\\WHITE8x8",
+            edgeSize = 1,
+        })
+        s:SetBackdropColor(0.05, 0.05, 0.05, 0.85)
+        s:SetBackdropBorderColor(color.r * 0.6, color.g * 0.6, color.b * 0.6, 1)
+        local lbl = s:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        lbl:SetPoint("TOPLEFT", 10, -8)
+        lbl:SetText(title)
+        lbl:SetTextColor(color.r, color.g, color.b)
+        return s
+    end
+
+    local function AddCheck(parent, db_key, label, x, y, onChange)
+        local c = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
+        c:SetPoint("TOPLEFT", x, y)
+        c:SetChecked(TotemBuddyDB[db_key])
+        c:SetScript("OnClick", function(self)
+            TotemBuddyDB[db_key] = self:GetChecked()
+            if onChange then onChange(self:GetChecked()) end
+        end)
+        local t = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        t:SetPoint("LEFT", c, "RIGHT", 2, 0)
+        t:SetText(label)
+        return c
+    end
+
+    local function AddScaleSlider(parent, db_key, x, y, onChanged)
+        local slider = CreateFrame("Slider", nil, parent, "OptionsSliderTemplate")
+        slider:SetSize(140, 16)
+        slider:SetPoint("TOPLEFT", x, y)
+        slider:SetMinMaxValues(0.6, 2.0)
+        slider:SetValueStep(0.05)
+        slider:SetObeyStepOnDrag(true)
+        slider:SetValue(TotemBuddyDB[db_key] or 1.0)
+        slider.Low:SetText("60%")
+        slider.High:SetText("200%")
+        local val = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        val:SetPoint("LEFT", slider, "RIGHT", 6, 0)
+        val:SetText(string.format("%d%%", (TotemBuddyDB[db_key] or 1.0) * 100))
+        slider:SetScript("OnValueChanged", function(self, v)
+            v = math.floor(v * 20 + 0.5) / 20
+            TotemBuddyDB[db_key] = v
+            val:SetText(string.format("%d%%", v * 100))
+            if onChanged then onChanged(v) end
+        end)
+        return slider
+    end
+
+    local function AddConfigBtn(parent, label, x, y, onClick)
+        local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+        b:SetSize(80, 22)
+        b:SetPoint("TOPLEFT", x, y)
+        b:SetText(label)
+        b:SetScript("OnClick", onClick)
+        return b
+    end
+
+    -- Quick React Bar
+    local qSection = CreateBarSection(barsContent, "Quick-React Bar", 0, { r=0.6, g=0.8, b=1.0 })
+    AddCheck(qSection, "quickReactEnabled", "Show", 10, -26, function(v)
+        if addon.RefreshQuickBar then addon.RefreshQuickBar() end
+    end)
+    AddCheck(qSection, "quickReactLocked", "Lock position", 100, -26)
+    AddScaleSlider(qSection, "quickReactScale", 10, -50, function(v)
+        if addon.RefreshQuickBar then addon.RefreshQuickBar() end
+    end)
+    AddConfigBtn(qSection, "Configure...", 430, -26, function()
+        if addon.ToggleQuickConfig then addon.ToggleQuickConfig() end
+    end)
+
+    -- Shield Bar
+    local sSection = CreateBarSection(barsContent, "Shield Bar", -78, { r=0.4, g=0.8, b=0.4 })
+    AddCheck(sSection, "showEarthShield", "Earth Shield", 10, -26, function()
+        if addon.RefreshShieldBar then addon.RefreshShieldBar() end
+    end)
+    AddCheck(sSection, "showLightningShield", "Lightning Shield", 130, -26, function()
+        if addon.RefreshShieldBar then addon.RefreshShieldBar() end
+    end)
+    AddCheck(sSection, "showWaterShield", "Water Shield", 270, -26, function()
+        if addon.RefreshShieldBar then addon.RefreshShieldBar() end
+    end)
+    AddCheck(sSection, "shieldsLocked", "Lock position", 10, -50)
+    AddScaleSlider(sSection, "shieldsScale", 145, -50, function(v)
+        if addon.RefreshShieldBar then addon.RefreshShieldBar() end
+    end)
+    AddConfigBtn(sSection, "Configure...", 430, -26, function()
+        if addon.ToggleShieldConfig then addon.ToggleShieldConfig() end
+    end)
+
+    -- Cooldown Bar
+    local cSection = CreateBarSection(barsContent, "Cooldown Bar", -156, { r=0.9, g=0.7, b=0.3 })
+    AddCheck(cSection, "showCooldownBar", "Show", 10, -26, function(v)
+        if addon.RefreshCooldownBar then addon.RefreshCooldownBar() end
+    end)
+    AddCheck(cSection, "cooldownTrackTrinkets", "Track Trinkets", 100, -26, function()
+        if addon.RefreshCooldownBar then addon.RefreshCooldownBar() end
+    end)
+    AddCheck(cSection, "nsGlowEnabled", "NS Glow", 240, -26)
+    AddCheck(cSection, "cooldownBarLocked", "Lock position", 10, -50)
+    AddScaleSlider(cSection, "cooldownBarScale", 145, -50, function(v)
+        if addon.RefreshCooldownBar then addon.RefreshCooldownBar() end
+    end)
+
+    -- Dispel Bar
+    local dSection = CreateBarSection(barsContent, "Dispel Bar", -234, { r=0.7, g=1.0, b=0.6 })
+    AddCheck(dSection, "showDispelBar", "Show", 10, -26, function(v)
+        if addon.RefreshDispelBar then addon.RefreshDispelBar() end
+    end)
+    AddCheck(dSection, "dispelLocked", "Lock position", 100, -26)
+    AddScaleSlider(dSection, "dispelScale", 10, -50, function(v)
+        if addon.RefreshDispelBar then addon.RefreshDispelBar() end
+    end)
+
+    local targetModeLabel = dSection:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    targetModeLabel:SetPoint("TOPLEFT", 250, -26)
+    targetModeLabel:SetText("Target Mode:")
+    targetModeLabel:SetTextColor(1, 0.82, 0)
+    local targetModeDropdown = CreateDropdown(dSection, "", {
+        { label = "Smart",     value = "smart" },
+        { label = "Mouseover", value = "mouseover" },
+        { label = "Target",    value = "target" },
+        { label = "Self",      value = "player" },
+    }, TotemBuddyDB.dispelTargetMode or "smart", 340, -16, function(v)
+        TotemBuddyDB.dispelTargetMode = v
+        if addon.RefreshDispelBar then addon.RefreshDispelBar() end
+    end)
+    AddConfigBtn(dSection, "Configure...", 430, -26, function()
+        if addon.ToggleDispelConfig then addon.ToggleDispelConfig() end
+    end)
 
     -- Sets tab content (built in UI/SetsTab.lua)
     local setsContent = CreateFrame("Frame", nil, contentFrame)

@@ -35,6 +35,9 @@ local function BuildSpecs()
     if TotemBuddyDB.showHealingWay then
         table.insert(specs, { kind = "buff", spellID = addon.HEALING_WAY_BUFF, units = { "focus", "target" } })
     end
+    if TotemBuddyDB.showAncestralHealing then
+        table.insert(specs, { kind = "buff", spellID = addon.ANCESTRAL_HEALING_BUFF, units = { "focus", "target" }, noCount = true })
+    end
     return specs
 end
 
@@ -99,12 +102,25 @@ local function EnsureTracker(i)
     local overlay = CreateFrame("Frame", nil, t)
     overlay:SetAllPoints()
     overlay:SetFrameLevel(t:GetFrameLevel() + 8)
-    t.countText = overlay:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+    overlay:EnableMouse(false)
+    t.countText = overlay:CreateFontString(nil, "OVERLAY")
+    t.countText:SetFont("Fonts\\FRIZQT__.TTF", 11, "OUTLINE")
     t.countText:SetPoint("BOTTOMRIGHT", t, "BOTTOMRIGHT", -2, 2)
     t.countText:SetTextColor(1, 1, 1)
 
-    -- Hover tooltip (uses spec set in RefreshCooldownBar)
+    -- Hover tooltip and drag forwarding to the bar
     t:EnableMouse(true)
+    t:RegisterForDrag("LeftButton")
+    t:SetScript("OnDragStart", function()
+        if not TotemBuddyDB.cooldownBarLocked and not InCombatLockdown() then
+            bar:StartMoving()
+        end
+    end)
+    t:SetScript("OnDragStop", function()
+        bar:StopMovingOrSizing()
+        local point, _, _, x, y = bar:GetPoint()
+        TotemBuddyDB.cooldownBarPos = { point = point, x = x, y = y }
+    end)
     t:SetScript("OnEnter", function(self)
         if TotemBuddyDB.showTooltips == false or not self.spec then return end
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -181,7 +197,7 @@ function addon.UpdateCooldownBar()
                 if count and count > 0 then
                     t.icon:SetDesaturated(false)
                     t.icon:SetAlpha(1)
-                    t.countText:SetText(count)
+                    t.countText:SetText((not spec.noCount) and tostring(count) or "")
                     t.border:SetBackdropBorderColor(0.2, 0.8, 0.4, 1)
                     if expiration and duration and expiration > 0 and duration > 0 then
                         t.cooldown:SetCooldown(expiration - duration, duration)
