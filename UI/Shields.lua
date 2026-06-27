@@ -305,19 +305,25 @@ local function EnsureShieldButton(def)
     btn.border:SetBackdropBorderColor(def.color.r, def.color.g, def.color.b, 1)
     btn.border:EnableMouse(false)
 
-    -- No CooldownFrameTemplate: the template adds a CooldownFrameCount child with mouse
-    -- enabled, which intercepts clicks on the button even when the parent has EnableMouse(false).
     local cd = CreateFrame("Cooldown", nil, btn)
-    cd:SetAllPoints(btn.icon)
+    cd:SetAllPoints(btn)
     cd:SetDrawEdge(false)
     cd:SetHideCountdownNumbers(true)
     cd:EnableMouse(false)
+    -- The Cooldown C++ type may create internal child frames (countdown wrapper).
+    -- Explicitly kill mouse on all of them so none intercept clicks.
+    for _, child in ipairs({cd:GetChildren()}) do
+        child:EnableMouse(false)
+    end
     btn.cooldown = cd
 
-    -- Text overlay above the cooldown swipe so it isn't dimmed
+    -- Text overlay above the cooldown swipe. EnableMouse(false) is REQUIRED —
+    -- in TBC Classic Anniversary the engine can leave Frame mouse-capture on,
+    -- which makes the overlay eat every click on the button.
     local overlay = CreateFrame("Frame", nil, btn)
     overlay:SetAllPoints()
     overlay:SetFrameLevel(btn:GetFrameLevel() + 10)
+    overlay:EnableMouse(false)
 
     btn.countText = overlay:CreateFontString(nil, "OVERLAY")
     btn.countText:SetFont("Fonts\\FRIZQT__.TTF", 13, "OUTLINE")
