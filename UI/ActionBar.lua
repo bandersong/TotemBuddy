@@ -52,15 +52,15 @@ function addon.CreateActionBarFrame()
     actionBarFrame:SetBackdropColor(0.05, 0.05, 0.05, 0.9)
     actionBarFrame:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
 
-    -- Make movable with Ctrl+Click
     actionBarFrame:SetMovable(true)
     actionBarFrame:EnableMouse(true)
-    actionBarFrame:SetScript("OnMouseDown", function(self, button)
-        if button == "LeftButton" and IsControlKeyDown() and not TotemBuddyDB.locked then
+    actionBarFrame:RegisterForDrag("LeftButton")
+    actionBarFrame:SetScript("OnDragStart", function(self)
+        if not TotemBuddyDB.locked and not InCombatLockdown() then
             self:StartMoving()
         end
     end)
-    actionBarFrame:SetScript("OnMouseUp", function(self, button)
+    actionBarFrame:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
         local point, _, _, x, y = self:GetPoint()
         TotemBuddyDB.barPos = { point = point, x = x, y = y }
@@ -135,7 +135,7 @@ function addon.CreateActionBarFrame()
 
         -- Set up secure casting (but not when ctrl is held)
         btn:SetAttribute("type1", "spell")
-        btn:SetAttribute("ctrl-type1", nil) -- Do nothing on ctrl+click
+        btn:SetAttribute("ctrl-type1", nil) -- ctrl+click should not cast; drag takes over
         if totemData then
             -- Cast by name so WoW auto-selects highest trained rank
             local totemName = addon.GetTotemName(spellID)
@@ -159,16 +159,14 @@ function addon.CreateActionBarFrame()
             end
         end)
 
-        -- Ctrl+click to move the frame
-        btn:HookScript("OnMouseDown", function(self, button)
-            if button == "LeftButton" and IsControlKeyDown() and not TotemBuddyDB.locked and not InCombatLockdown() then
+        btn:RegisterForDrag("LeftButton")
+        btn:SetScript("OnDragStart", function(self)
+            if not TotemBuddyDB.locked and not InCombatLockdown() then
                 actionBarFrame:StartMoving()
             end
         end)
-        btn:HookScript("OnMouseUp", function(self, button)
-            if not InCombatLockdown() then
-                actionBarFrame:StopMovingOrSizing()
-            end
+        btn:SetScript("OnDragStop", function(self)
+            actionBarFrame:StopMovingOrSizing()
             local point, _, _, x, y = actionBarFrame:GetPoint()
             TotemBuddyDB.barPos = { point = point, x = x, y = y }
         end)

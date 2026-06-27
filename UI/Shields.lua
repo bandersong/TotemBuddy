@@ -145,11 +145,11 @@ function addon.RescanShields(force)
                     if force or (now - lastEarthScan) >= SCAN_THROTTLE then
                         lastEarthScan = now
                         local c, d, e = FindEarthShield(name)
-                        shieldState.earth = c and { count = c, duration = d, expiration = e } or nil
+                        shieldState.earth = (c and c > 0) and { count = c, duration = d, expiration = e } or nil
                     end
                 else
                     local c, d, e = FindLightningShield(name)
-                    shieldState[def.key] = c and { count = c, duration = d, expiration = e } or nil
+                    shieldState[def.key] = (c and c > 0) and { count = c, duration = d, expiration = e } or nil
                 end
             end
         else
@@ -266,6 +266,17 @@ local function EnsureShieldButton(def)
     btn:SetSize(BTN_SIZE, BTN_SIZE)
     -- AnyDown only (cast on press, once) — see QuickBar for why AnyUp is dropped.
     btn:RegisterForClicks("AnyDown")
+    btn:RegisterForDrag("LeftButton")
+    btn:SetScript("OnDragStart", function(self)
+        if not TotemBuddyDB.shieldsLocked and not InCombatLockdown() then
+            shieldBar:StartMoving()
+        end
+    end)
+    btn:SetScript("OnDragStop", function(self)
+        shieldBar:StopMovingOrSizing()
+        local point, _, _, x, y = shieldBar:GetPoint()
+        TotemBuddyDB.shieldsPos = { point = point, x = x, y = y }
+    end)
 
     btn.icon = btn:CreateTexture(nil, "ARTWORK")
     btn.icon:SetPoint("TOPLEFT", 2, -2)
@@ -280,12 +291,13 @@ local function EnsureShieldButton(def)
     btn.border:SetBackdropBorderColor(def.color.r, def.color.g, def.color.b, 1)
     btn.border:EnableMouse(false)
 
-    local cd = CreateFrame("Cooldown", nil, btn, "CooldownFrameTemplate")
+    -- No CooldownFrameTemplate: the template adds a CooldownFrameCount child with mouse
+    -- enabled, which intercepts clicks on the button even when the parent has EnableMouse(false).
+    local cd = CreateFrame("Cooldown", nil, btn)
     cd:SetAllPoints(btn.icon)
     cd:SetDrawEdge(false)
     cd:SetHideCountdownNumbers(true)
-    cd.noCooldownCount = true -- we draw our own time text
-    cd:EnableMouse(false)      -- don't let the swipe eat clicks to the cast button
+    cd:EnableMouse(false)
     btn.cooldown = cd
 
     -- Text overlay above the cooldown swipe so it isn't dimmed
@@ -313,7 +325,7 @@ local function EnsureShieldButton(def)
                 GameTooltip:AddLine("Target: " .. (TotemBuddyDB.earthShieldTargetMode or "smart"), 0.6, 0.8, 0.6)
             end
             local chord = GetShieldKeybinds()[def.key]
-            GameTooltip:AddLine(chord and ("Bound: " .. chord) or "Right-click to set keybind", 0.7, 0.7, 0.7)
+            GameTooltip:AddLine(chord and ("Bound: " .. chord) or "Right-click for keybind options", 0.7, 0.7, 0.7)
             GameTooltip:Show()
         end
     end)
@@ -332,20 +344,19 @@ local function EnsureShieldButton(def)
         if clickButton == "RightButton" and not InCombatLockdown() then
             local name = addon.GetTotemName(def.spellID)
             local chord = GetShieldKeybinds()[def.key]
-            print("|cFF00FF00TotemBuddy:|r " .. (name or def.key)
-                .. (chord and " (current: " .. chord .. ")" or "")
-                .. " — press a key to bind, Escape to clear")
-            addon.CaptureKeybind(self, function(newChord)
-                if newChord then
-                    addon.WarnKeybindConflict(newChord, "Shield: " .. (name or def.key))
+            addon.ShowKeybindMenu(self, name, chord,
+                function()
+                    addon.ShowKeybindCapture(self, name, function(newChord)
+                        if newChord then
+                            addon.WarnKeybindConflict(newChord, "Shield: " .. (name or def.key))
+                        end
+                        addon.SetShieldKeybind(def.key, newChord)
+                    end)
+                end,
+                function()
+                    addon.SetShieldKeybind(def.key, nil)
                 end
-                addon.SetShieldKeybind(def.key, newChord)
-                if newChord then
-                    print("|cFF00FF00TotemBuddy:|r Bound " .. (name or def.key) .. " \226\134\146 " .. newChord)
-                else
-                    print("|cFF00FF00TotemBuddy:|r Cleared keybind for " .. (name or def.key))
-                end
-            end)
+            )
         end
     end)
 

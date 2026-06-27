@@ -200,7 +200,7 @@ function addon.UpdateCooldownBar()
                 -- spell or item cooldown
                 local start, duration, enable
                 if spec.kind == "item" then
-                    start, duration, enable = GetInventoryItemCooldown("player", spec.slot)
+                    start, duration, enable = GetInventoryItemCooldown(spec.slot)
                 else
                     start, duration, enable = GetSpellCooldown(spec.spellID)
                 end

@@ -390,9 +390,13 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1, arg2, arg3)
         if arg1 == "player" then
             addon.UpdateTimers()
         end
-        -- Shield trackers care about any unit (Earth Shield is on others). The
-        -- Earth Shield group scan is throttled inside UpdateShields.
-        if addon.UpdateShields then addon.UpdateShields() end
+        -- Shield trackers care about party/raid/focus/target — not boss or NPC units,
+        -- which generate high aura traffic and would flood the scan unnecessarily.
+        local u = arg1
+        if u == "player" or u == "target" or u == "focus"
+            or (u:match("^party%d$")) or (u:match("^raid%d+$")) then
+            if addon.UpdateShields then addon.UpdateShields() end
+        end
 
     elseif event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_TARGET_CHANGED" or event == "PLAYER_FOCUS_CHANGED" then
         -- A relevant unit may now (or no longer) hold your Earth Shield: force a rescan.

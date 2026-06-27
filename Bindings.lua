@@ -118,6 +118,14 @@ function addon.CollectTotemBuddyKeybinds()
         end
     end
 
+    for key, chord in pairs(TotemBuddyDB and TotemBuddyDB.dispelKeybinds or {}) do
+        if chord and chord ~= "" then
+            local def = addon.DISPEL_BY_KEY and addon.DISPEL_BY_KEY[key]
+            local nm = def and addon.GetTotemName(def.spellID) or key
+            table.insert(out, { chord = chord, label = "Dispel: " .. nm })
+        end
+    end
+
     return out
 end
 
@@ -173,5 +181,182 @@ function addon.CaptureKeybind(frame, onCaptured)
         if IsControlKeyDown() then chord = chord .. "CTRL-" end
         if IsShiftKeyDown() then chord = chord .. "SHIFT-" end
         onCaptured(chord .. key)
+    end)
+end
+
+-- ── Shared keybind context menu ──────────────────────────────────────────────
+
+local keybindMenu
+local keybindCapture
+
+local function GetKeybindMenu()
+    if keybindMenu then return keybindMenu end
+
+    local f = CreateFrame("Frame", "TotemBuddyKeybindMenu", UIParent, "BackdropTemplate")
+    f:SetFrameStrata("FULLSCREEN_DIALOG")
+    f:SetSize(174, 100)
+    f:SetBackdrop({
+        bgFile   = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        edgeSize = 12,
+        insets   = { left = 4, right = 4, top = 4, bottom = 4 },
+    })
+    f:SetBackdropColor(0.08, 0.08, 0.08, 0.97)
+    f:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
+
+    -- Spell name
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    title:SetPoint("TOPLEFT", 10, -10)
+    title:SetPoint("TOPRIGHT", -10, -10)
+    title:SetJustifyH("LEFT")
+    title:SetTextColor(1, 0.82, 0)
+    f.title = title
+
+    -- Current chord
+    local bindLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    bindLabel:SetPoint("TOPLEFT", 10, -27)
+    bindLabel:SetPoint("TOPRIGHT", -10, -27)
+    bindLabel:SetJustifyH("LEFT")
+    f.bindLabel = bindLabel
+
+    -- Divider
+    local div = f:CreateTexture(nil, "ARTWORK")
+    div:SetHeight(1)
+    div:SetPoint("TOPLEFT",  6, -42)
+    div:SetPoint("TOPRIGHT", -6, -42)
+    div:SetColorTexture(0.4, 0.4, 0.4, 0.6)
+
+    local function MakeRow(yOff, label)
+        local btn = CreateFrame("Button", nil, f)
+        btn:SetSize(156, 22)
+        btn:SetPoint("TOPLEFT", 8, yOff)
+        local bg = btn:CreateTexture(nil, "BACKGROUND")
+        bg:SetAllPoints()
+        bg:SetColorTexture(0, 0, 0, 0)
+        btn.bg = bg
+        local txt = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        txt:SetPoint("LEFT", 6, 0)
+        txt:SetText(label)
+        btn.txt = txt
+        return btn
+    end
+
+    f.setBtn   = MakeRow(-49, "Set Keybind")
+    f.clearBtn = MakeRow(-73, "Clear Keybind")
+
+    f.setBtn.txt:SetTextColor(0.9, 0.9, 0.9)
+
+    f.setBtn:SetScript("OnEnter", function(self) self.bg:SetColorTexture(0.2, 0.4, 0.8, 0.5) end)
+    f.setBtn:SetScript("OnLeave", function(self) self.bg:SetColorTexture(0, 0, 0, 0) end)
+
+    -- Click-off blocker sits behind the menu in the same strata group
+    local blocker = CreateFrame("Frame", nil, UIParent)
+    blocker:SetAllPoints()
+    blocker:EnableMouse(true)
+    blocker:SetFrameStrata("FULLSCREEN")
+    blocker:SetScript("OnMouseDown", function() f:Hide() end)
+    blocker:Hide()
+    f.blocker = blocker
+
+    f:SetScript("OnHide", function(self)
+        self.blocker:Hide()
+        self:EnableKeyboard(false)
+        self:SetPropagateKeyboardInput(true)
+    end)
+    f:SetScript("OnKeyDown", function(self, key)
+        if key == "ESCAPE" then self:Hide() end
+    end)
+
+    keybindMenu = f
+    return f
+end
+
+local function GetKeybindCapture()
+    if keybindCapture then return keybindCapture end
+
+    local f = CreateFrame("Frame", "TotemBuddyKeybindCapture", UIParent, "BackdropTemplate")
+    f:SetSize(190, 66)
+    f:SetFrameStrata("FULLSCREEN_DIALOG")
+    f:SetBackdrop({
+        bgFile   = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        edgeSize = 12,
+        insets   = { left = 4, right = 4, top = 4, bottom = 4 },
+    })
+    f:SetBackdropColor(0.05, 0.05, 0.15, 0.97)
+    f:SetBackdropBorderColor(0.3, 0.3, 0.9, 1)
+
+    local header = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    header:SetPoint("TOPLEFT", 10, -10)
+    header:SetTextColor(0.6, 0.6, 0.6)
+    header:SetText("Setting keybind for:")
+    f.header = header
+
+    local nameLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    nameLabel:SetPoint("TOPLEFT", 10, -26)
+    nameLabel:SetTextColor(1, 0.82, 0)
+    f.nameLabel = nameLabel
+
+    local prompt = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    prompt:SetPoint("TOPLEFT", 10, -44)
+    prompt:SetTextColor(0.85, 0.85, 0.85)
+    prompt:SetText("Press a key...  (Esc to cancel)")
+    f.prompt = prompt
+
+    keybindCapture = f
+    return f
+end
+
+-- Show a right-click keybind context menu anchored to a button.
+-- onSet() is called when the user picks "Set Keybind".
+-- onClear() is called when the user picks "Clear Keybind" (only enabled when chord is set).
+function addon.ShowKeybindMenu(anchor, spellName, currentChord, onSet, onClear)
+    local f = GetKeybindMenu()
+
+    f.title:SetText(spellName or "Keybind")
+    if currentChord then
+        f.bindLabel:SetText("|cFFFFFF00" .. currentChord .. "|r")
+        f.clearBtn.txt:SetTextColor(0.9, 0.4, 0.4)
+        f.clearBtn:SetScript("OnEnter", function(s) s.bg:SetColorTexture(0.6, 0.2, 0.2, 0.5) end)
+        f.clearBtn:SetScript("OnLeave", function(s) s.bg:SetColorTexture(0, 0, 0, 0) end)
+        f.clearBtn:SetScript("OnClick", function()
+            f:Hide()
+            if onClear then onClear() end
+        end)
+    else
+        f.bindLabel:SetText("|cFF666666No keybind set|r")
+        f.clearBtn.txt:SetTextColor(0.35, 0.35, 0.35)
+        f.clearBtn:SetScript("OnEnter", nil)
+        f.clearBtn:SetScript("OnLeave", nil)
+        f.clearBtn:SetScript("OnClick", nil)
+    end
+
+    f.setBtn:SetScript("OnClick", function()
+        f:Hide()
+        if onSet then onSet() end
+    end)
+
+    f:ClearAllPoints()
+    f:SetPoint("TOPLEFT", anchor, "BOTTOMRIGHT", -2, -2)
+
+    f:EnableKeyboard(true)
+    f:SetPropagateKeyboardInput(false)
+    f.blocker:Show()
+    f:Show()
+    f:Raise()
+end
+
+-- Show a small capture overlay near anchor; calls onCaptured(chord) when done.
+function addon.ShowKeybindCapture(anchor, spellName, onCaptured)
+    local f = GetKeybindCapture()
+    f.nameLabel:SetText(spellName or "")
+    f:ClearAllPoints()
+    f:SetPoint("TOPLEFT", anchor, "BOTTOMRIGHT", -2, -2)
+    f:Show()
+    f:Raise()
+
+    addon.CaptureKeybind(f, function(chord)
+        f:Hide()
+        onCaptured(chord)
     end)
 end

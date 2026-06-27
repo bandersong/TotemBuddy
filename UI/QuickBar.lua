@@ -150,17 +150,30 @@ local function EnsureQuickButton(i)
     -- per click (cast on press AND on release), which felt like dropped/unreliable
     -- clicks. One cast on press is the most responsive for dropping totems.
     btn:RegisterForClicks("AnyDown")
+    -- Drag on a button forwards movement to the parent bar so the whole surface is
+    -- grabbable, not just the tiny padding strip around the buttons.
+    btn:RegisterForDrag("LeftButton")
+    btn:SetScript("OnDragStart", function(self)
+        if not TotemBuddyDB.quickReactLocked and not InCombatLockdown() then
+            quickBar:StartMoving()
+        end
+    end)
+    btn:SetScript("OnDragStop", function(self)
+        quickBar:StopMovingOrSizing()
+        local point, _, _, x, y = quickBar:GetPoint()
+        TotemBuddyDB.quickReactPos = { point = point, x = x, y = y }
+    end)
 
     btn.icon = btn:CreateTexture(nil, "ARTWORK")
     btn.icon:SetAllPoints()
     btn.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 
-    local cd = CreateFrame("Cooldown", nil, btn, "CooldownFrameTemplate")
-    cd:SetAllPoints(btn.icon)
+    -- No CooldownFrameTemplate: the template adds child frames that intercept
+    -- clicks even when EnableMouse(false) is set on the parent cooldown frame.
+    local cd = CreateFrame("Cooldown", nil, btn)
+    cd:SetAllPoints(btn)
     cd:SetSwipeColor(0, 0, 0, 0.8)
     cd:SetDrawEdge(false)
-    -- CRITICAL: a full-size Cooldown frame sits on top of the button and eats the
-    -- click. Disable its mouse so clicks reach the SecureActionButton underneath.
     cd:EnableMouse(false)
     btn.cooldown = cd
 
@@ -169,7 +182,7 @@ local function EnsureQuickButton(i)
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
             GameTooltip:SetSpellByID(self.spellID)
             local chord = GetKeybinds()[self.spellID]
-            GameTooltip:AddLine(chord and ("Bound: " .. chord) or "Right-click to set keybind", 0.7, 0.7, 0.7)
+            GameTooltip:AddLine(chord and ("Bound: " .. chord) or "Right-click for keybind options", 0.7, 0.7, 0.7)
             GameTooltip:Show()
         end
     end)
@@ -181,20 +194,19 @@ local function EnsureQuickButton(i)
             if not sid then return end
             local name = addon.GetTotemName(sid)
             local chord = GetKeybinds()[sid]
-            print("|cFF00FF00TotemBuddy:|r " .. (name or "Totem")
-                .. (chord and " (current: " .. chord .. ")" or "")
-                .. " — press a key to bind, Escape to clear")
-            addon.CaptureKeybind(self, function(newChord)
-                if newChord and addon.WarnKeybindConflict then
-                    addon.WarnKeybindConflict(newChord, "Quick: " .. (name or sid))
+            addon.ShowKeybindMenu(self, name, chord,
+                function()
+                    addon.ShowKeybindCapture(self, name, function(newChord)
+                        if newChord and addon.WarnKeybindConflict then
+                            addon.WarnKeybindConflict(newChord, "Quick: " .. (name or sid))
+                        end
+                        addon.SetQuickKeybind(sid, newChord)
+                    end)
+                end,
+                function()
+                    addon.SetQuickKeybind(sid, nil)
                 end
-                addon.SetQuickKeybind(sid, newChord)
-                if newChord then
-                    print("|cFF00FF00TotemBuddy:|r Bound " .. (name or "Totem") .. " \226\134\146 " .. newChord)
-                else
-                    print("|cFF00FF00TotemBuddy:|r Cleared keybind for " .. (name or "Totem"))
-                end
-            end)
+            )
         end
     end)
 

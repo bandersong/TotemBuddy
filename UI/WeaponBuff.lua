@@ -108,7 +108,7 @@ function addon.CreateWeaponBuffButton(isVertical)
     end
 
     -- Register for clicks
-    btn:RegisterForClicks("AnyDown", "AnyUp")
+    btn:RegisterForClicks("AnyDown")
 
     -- Set up default spell (first known buff, will be updated by UpdateWeaponBuffButton)
     local defaultBuffName = addon.GetWeaponBuffName(knownBuffs[1].spellID)
