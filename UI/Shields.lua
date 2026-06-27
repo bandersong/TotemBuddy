@@ -92,9 +92,9 @@ end
 local function ScanUnit(unit, name)
     if not UnitExists(unit) then return nil end
     for i = 1, 40 do
-        -- TBC Classic UnitBuff: name, rank, icon, count, debuffType, duration,
-        -- expirationTime, source, ... , spellId. "PLAYER" filter = only mine.
-        local n, _, _, count, _, duration, expiration = UnitBuff(unit, i, "PLAYER")
+        -- TBC Anniversary 2.5.x UnitBuff: name, icon, count, debuffType, duration,
+        -- expirationTime, source (rank removed in 2.5.x). "PLAYER" filter = only mine.
+        local n, _, count, _, duration, expiration = UnitBuff(unit, i, "PLAYER")
         if not n then break end
         if n == name then
             return count or 0, duration or 0, expiration or 0

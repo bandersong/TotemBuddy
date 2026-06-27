@@ -266,11 +266,12 @@ end
 
 -- Shared aura scan: find a buff by (rank-independent) localized name on `unit`.
 -- Pass filter "PLAYER" to only see auras YOU cast. Returns count, duration,
--- expiration (TBC UnitBuff tuple: count=4, duration=6, expirationTime=7) or nil.
+-- expiration (TBC Anniversary 2.5.x UnitBuff: name, icon, count, debuffType,
+-- duration, expirationTime -- rank field was removed in the 2.5.x client) or nil.
 function addon.ScanUnitAura(unit, name, filter)
     if not unit or not name or not UnitExists(unit) then return nil end
     for i = 1, 40 do
-        local n, _, _, count, _, duration, expiration = UnitBuff(unit, i, filter)
+        local n, _, count, _, duration, expiration = UnitBuff(unit, i, filter)
         if not n then break end
         if n == name then
             return count or 0, duration or 0, expiration or 0
