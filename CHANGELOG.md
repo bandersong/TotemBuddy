@@ -4,6 +4,39 @@ All notable changes to TotemBuddy. TotemBuddy is a fork of
 [TotemDeck](https://github.com/iltGames/TotemDeck) (MIT); versions below cover
 the fork's additions.
 
+## [2.2.0] — Shield target tracking, Ancestral Healing tracker & bug fixes
+
+### Added
+- **Earth Shield target label.** The Earth Shield button now shows the name of
+  whoever has your shield below the icon, class-colored. Scans focus → target →
+  mouseover → party/raid so it finds the tank automatically.
+- **Ancestral Healing tracker.** New icon in the cooldown cluster tracks the
+  "Ancestral Strength" proc — the 25% physical damage reduction buff your target
+  receives when you land a critical heal. Lights up green with a duration swipe
+  while active. Controlled by the existing cooldown bar settings.
+
+### Fixed
+- **Shield charge count invisible.** Stack count on Earth/Lightning/Water Shield
+  buttons wasn't rendering: `SetText` was receiving a raw Lua number (WoW needs a
+  string), and `NumberFontNormal` has no outline so the text was invisible against
+  the dark cooldown swipe. Fixed with `tostring()` and explicit outlined font.
+- **Shield buttons only clickable in a narrow strip.** The overlay Frame covering
+  each shield button was intercepting all mouse events. `overlay:EnableMouse(false)`
+  plus a `GetChildren()` loop on the Cooldown frame to disable any internal child
+  frames — same pattern as the working QuickBar buttons.
+- **Healing Way stack count not showing.** Same `SetText(number)` and font-outline
+  bugs as the shield buttons; both fixed in the cooldown tracker.
+- **Cooldown bar immovable.** Tracker frames sit on top of the bar with mouse
+  enabled for tooltips but had no drag handlers, so every drag attempt was silently
+  dropped. Drag events on tracker icons now forward to the bar.
+- **`GetInventoryItemCooldown` crash.** TBC Classic Anniversary requires
+  `("player", slot)`; the bare `(slot)` call errored on load.
+- **`UnitBuff` return values off by one.** TBC Classic Anniversary 2.5.x omits the
+  `rank` field from `UnitBuff` returns. Both `ScanUnit` (Shields.lua) and
+  `addon.ScanUnitAura` (Core.lua) had an extra placeholder that shifted every value
+  one slot right — `count` was getting the debuff type string, causing a
+  "attempt to compare number with string" crash on every shield and buff scan.
+
 ## [2.1.0] — Shields, cooldowns, dispels & the "hard to click" fix
 
 ### Added
