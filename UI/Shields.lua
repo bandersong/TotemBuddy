@@ -193,7 +193,7 @@ local function UpdateShieldButtonDisplay(def, btn)
         -- Charges
         local warn = TotemBuddyDB.shieldLowChargeWarn or 0
         local low = warn > 0 and st.count and st.count <= warn and st.count > 0
-        btn.countText:SetText(st.count and st.count > 0 and st.count or "")
+        btn.countText:SetText((st.count and st.count > 0) and tostring(st.count) or "")
         if low then
             btn.countText:SetTextColor(1, 0.3, 0.3)
         else
@@ -319,15 +319,15 @@ local function EnsureShieldButton(def)
     overlay:SetAllPoints()
     overlay:SetFrameLevel(btn:GetFrameLevel() + 10)
 
-    btn.countText = overlay:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+    btn.countText = overlay:CreateFontString(nil, "OVERLAY")
+    btn.countText:SetFont("Fonts\\FRIZQT__.TTF", 13, "OUTLINE")
     btn.countText:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -2, 2)
     btn.countText:SetTextColor(1, 1, 1)
 
-    btn.timeText = overlay:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
+    btn.timeText = overlay:CreateFontString(nil, "OVERLAY")
+    btn.timeText:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
     btn.timeText:SetPoint("TOP", btn, "TOP", 0, -2)
     btn.timeText:SetTextColor(1, 1, 1)
-    btn.timeText:SetShadowOffset(1, -1)
-    btn.timeText:SetShadowColor(0, 0, 0, 1)
 
     -- Earth Shield target name label (rendered below the button within the extended bar)
     if def.key == "earth" then
