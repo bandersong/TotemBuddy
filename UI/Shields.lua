@@ -22,6 +22,7 @@ local BTN_SIZE = 40
 local BTN_GAP = 4
 local PAD = 6
 local SCAN_THROTTLE = 0.25 -- seconds between Earth Shield group rescans
+local NAME_H = 14           -- extra bar height below buttons for Earth Shield target name
 
 local shieldOwner = CreateFrame("Frame", "TotemBuddyShieldOwner", UIParent)
 local shieldButtons = {}   -- key -> button
@@ -107,27 +108,27 @@ local function FindLightningShield(name)
     return ScanUnit("player", name)
 end
 
--- Find MY Earth Shield across likely units. Order favours the unit you most
--- likely shielded (focus/target tank), then yourself, then the group.
+-- Find MY Earth Shield across likely units. Returns count, duration, expiration,
+-- and the unit token that has the shield (e.g. "focus", "raid3", "player").
 local function FindEarthShield(name)
-    local count, duration, expiration = ScanUnit("focus", name)
-    if count then return count, duration, expiration end
-    count, duration, expiration = ScanUnit("target", name)
-    if count then return count, duration, expiration end
-    count, duration, expiration = ScanUnit("mouseover", name)
-    if count then return count, duration, expiration end
-    count, duration, expiration = ScanUnit("player", name)
-    if count then return count, duration, expiration end
-
+    local function tryUnit(unit)
+        local c, d, e = ScanUnit(unit, name)
+        if c then return c, d, e, unit end
+    end
+    local c, d, e, u
+    for _, unit in ipairs({"focus", "target", "mouseover", "player"}) do
+        c, d, e, u = tryUnit(unit)
+        if c then return c, d, e, u end
+    end
     if IsInRaid() then
         for i = 1, 40 do
-            count, duration, expiration = ScanUnit("raid" .. i, name)
-            if count then return count, duration, expiration end
+            c, d, e, u = tryUnit("raid" .. i)
+            if c then return c, d, e, u end
         end
     elseif IsInGroup() then
         for i = 1, 4 do
-            count, duration, expiration = ScanUnit("party" .. i, name)
-            if count then return count, duration, expiration end
+            c, d, e, u = tryUnit("party" .. i)
+            if c then return c, d, e, u end
         end
     end
     return nil
@@ -144,8 +145,8 @@ function addon.RescanShields(force)
                     local now = GetTime()
                     if force or (now - lastEarthScan) >= SCAN_THROTTLE then
                         lastEarthScan = now
-                        local c, d, e = FindEarthShield(name)
-                        shieldState.earth = (c and c > 0) and { count = c, duration = d, expiration = e } or nil
+                        local c, d, e, u = FindEarthShield(name)
+                        shieldState.earth = (c and c > 0) and { count = c, duration = d, expiration = e, targetUnit = u } or nil
                     end
                 else
                     local c, d, e = FindLightningShield(name)
@@ -164,6 +165,19 @@ end
 local function UpdateShieldButtonDisplay(def, btn)
     local st = shieldState[def.key]
     local now = GetTime()
+
+    -- Earth Shield: show the target's name below the button, class-colored.
+    if btn.nameLabel then
+        if st and st.targetUnit and UnitExists(st.targetUnit) then
+            local uname = UnitName(st.targetUnit) or ""
+            local _, class = UnitClass(st.targetUnit)
+            local cc = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
+            btn.nameLabel:SetTextColor(cc and cc.r or 0.9, cc and cc.g or 0.9, cc and cc.b or 0.9)
+            btn.nameLabel:SetText(uname)
+        else
+            btn.nameLabel:SetText("")
+        end
+    end
 
     -- Expired? drop the cache so it reads as missing.
     if st and st.expiration and st.expiration > 0 and (st.expiration - now) <= 0 then
@@ -315,6 +329,16 @@ local function EnsureShieldButton(def)
     btn.timeText:SetShadowOffset(1, -1)
     btn.timeText:SetShadowColor(0, 0, 0, 1)
 
+    -- Earth Shield target name label (rendered below the button within the extended bar)
+    if def.key == "earth" then
+        btn.nameLabel = overlay:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        btn.nameLabel:SetPoint("TOP", btn, "BOTTOM", 0, -2)
+        btn.nameLabel:SetWidth(BTN_SIZE + 16)
+        btn.nameLabel:SetJustifyH("CENTER")
+        btn.nameLabel:SetShadowOffset(1, -1)
+        btn.nameLabel:SetShadowColor(0, 0, 0, 1)
+    end
+
     btn:SetScript("OnEnter", function(self)
         self.border:SetBackdropBorderColor(1, 1, 1, 1)
         if TotemBuddyDB.showTooltips ~= false then
@@ -322,7 +346,11 @@ local function EnsureShieldButton(def)
             GameTooltip:SetSpellByID(def.spellID)
             GameTooltip:AddLine(" ")
             if def.key == "earth" then
-                GameTooltip:AddLine("Target: " .. (TotemBuddyDB.earthShieldTargetMode or "smart"), 0.6, 0.8, 0.6)
+                local st = shieldState[def.key]
+                if st and st.targetUnit and UnitExists(st.targetUnit) then
+                    GameTooltip:AddLine("On: " .. (UnitName(st.targetUnit) or "?"), 0.9, 0.9, 0.9)
+                end
+                GameTooltip:AddLine("Cast mode: " .. (TotemBuddyDB.earthShieldTargetMode or "smart"), 0.6, 0.8, 0.6)
             end
             local chord = GetShieldKeybinds()[def.key]
             GameTooltip:AddLine(chord and ("Bound: " .. chord) or "Right-click for keybind options", 0.7, 0.7, 0.7)
@@ -393,7 +421,7 @@ function addon.RefreshShieldBar()
             end
 
             btn:ClearAllPoints()
-            btn:SetPoint("LEFT", shieldBar, "LEFT", PAD + shown * (BTN_SIZE + BTN_GAP), 0)
+            btn:SetPoint("TOPLEFT", shieldBar, "TOPLEFT", PAD + shown * (BTN_SIZE + BTN_GAP), -PAD)
             btn:Show()
             shown = shown + 1
 
@@ -410,7 +438,7 @@ function addon.RefreshShieldBar()
     if shown == 0 then
         shieldBar:Hide()
     else
-        shieldBar:SetSize(PAD * 2 + shown * BTN_SIZE + (shown - 1) * BTN_GAP, BTN_SIZE + PAD * 2)
+        shieldBar:SetSize(PAD * 2 + shown * BTN_SIZE + (shown - 1) * BTN_GAP, BTN_SIZE + PAD * 2 + NAME_H)
         shieldBar:Show()
     end
 
