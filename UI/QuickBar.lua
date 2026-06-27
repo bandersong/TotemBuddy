@@ -11,7 +11,7 @@
 
 local addonName, addon = ...
 
-local BTN_SIZE = 36
+local BTN_SIZE = 40
 local BTN_GAP = 4
 local PAD = 6
 
@@ -122,9 +122,12 @@ local function CreateBarFrame()
 
     local pos = TotemBuddyDB.quickReactPos or { point = "CENTER", x = 0, y = -260 }
     f:SetPoint(pos.point or "CENTER", pos.x or 0, pos.y or -260)
+    f:SetScale(TotemBuddyDB.quickReactScale or 1.0)
 
+    -- Unlocked = plain left-drag to move (the old ctrl-drag was easy to miss and
+    -- made the bar feel stuck); locked = can't be nudged by a stray grab.
     f:SetScript("OnDragStart", function(self)
-        if not TotemBuddyDB.locked and IsControlKeyDown() and not InCombatLockdown() then
+        if not TotemBuddyDB.quickReactLocked and not InCombatLockdown() then
             self:StartMoving()
         end
     end)
@@ -143,7 +146,10 @@ local function EnsureQuickButton(i)
     local btn = CreateFrame("Button", "TotemBuddyQuickButton" .. i, quickBar, "SecureActionButtonTemplate")
     btn:SetSize(BTN_SIZE, BTN_SIZE)
     btn:SetAttribute("type1", "spell")
-    btn:RegisterForClicks("AnyDown", "AnyUp")
+    -- AnyDown only: registering AnyDown+AnyUp made the secure handler fire twice
+    -- per click (cast on press AND on release), which felt like dropped/unreliable
+    -- clicks. One cast on press is the most responsive for dropping totems.
+    btn:RegisterForClicks("AnyDown")
 
     btn.icon = btn:CreateTexture(nil, "ARTWORK")
     btn.icon:SetAllPoints()
@@ -153,6 +159,9 @@ local function EnsureQuickButton(i)
     cd:SetAllPoints(btn.icon)
     cd:SetSwipeColor(0, 0, 0, 0.8)
     cd:SetDrawEdge(false)
+    -- CRITICAL: a full-size Cooldown frame sits on top of the button and eats the
+    -- click. Disable its mouse so clicks reach the SecureActionButton underneath.
+    cd:EnableMouse(false)
     btn.cooldown = cd
 
     btn:SetScript("OnEnter", function(self)
@@ -176,6 +185,9 @@ local function EnsureQuickButton(i)
                 .. (chord and " (current: " .. chord .. ")" or "")
                 .. " — press a key to bind, Escape to clear")
             addon.CaptureKeybind(self, function(newChord)
+                if newChord and addon.WarnKeybindConflict then
+                    addon.WarnKeybindConflict(newChord, "Quick: " .. (name or sid))
+                end
                 addon.SetQuickKeybind(sid, newChord)
                 if newChord then
                     print("|cFF00FF00TotemBuddy:|r Bound " .. (name or "Totem") .. " \226\134\146 " .. newChord)
@@ -199,6 +211,7 @@ function addon.RefreshQuickBar()
         return
     end
     pendingQuick = false
+    quickBar:SetScale(TotemBuddyDB.quickReactScale or 1.0)
 
     -- Hidden entirely?
     if not TotemBuddyDB.quickReactEnabled then
@@ -284,7 +297,7 @@ local function BuildConfigWindow()
     if addon.UI.quickConfig then return addon.UI.quickConfig end
 
     local frame = CreateFrame("Frame", "TotemBuddyQuickConfig", UIParent, "BackdropTemplate")
-    frame:SetSize(360, 320)
+    frame:SetSize(360, 370)
     frame:SetPoint("CENTER")
     frame:SetFrameStrata("DIALOG")
     frame:SetMovable(true)
@@ -319,12 +332,45 @@ local function BuildConfigWindow()
     end)
     local showLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     showLabel:SetPoint("LEFT", showCheck, "RIGHT", 2, 0)
-    showLabel:SetText("Show quick-react bar  (Ctrl+drag the bar to move it)")
+    showLabel:SetText("Show quick-react bar")
     frame.showCheck = showCheck
+
+    -- Lock checkbox (when unlocked, drag the bar itself to move it)
+    local lockCheck = CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate")
+    lockCheck:SetPoint("TOPLEFT", 12, -62)
+    lockCheck:SetSize(22, 22)
+    lockCheck:SetScript("OnClick", function(self)
+        TotemBuddyDB.quickReactLocked = self:GetChecked()
+    end)
+    local lockLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    lockLabel:SetPoint("LEFT", lockCheck, "RIGHT", 2, 0)
+    lockLabel:SetText("Lock bar (uncheck, then drag the bar to move it)")
+    frame.lockCheck = lockCheck
+
+    -- Scale slider
+    local scaleSlider = CreateFrame("Slider", nil, frame, "OptionsSliderTemplate")
+    scaleSlider:SetSize(150, 16)
+    scaleSlider:SetPoint("TOPLEFT", 16, -92)
+    scaleSlider:SetMinMaxValues(0.6, 2.0)
+    scaleSlider:SetValueStep(0.05)
+    scaleSlider:SetObeyStepOnDrag(true)
+    scaleSlider:SetValue(TotemBuddyDB.quickReactScale or 1.0)
+    scaleSlider.Low:SetText("60%")
+    scaleSlider.High:SetText("200%")
+    local scaleText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    scaleText:SetPoint("LEFT", scaleSlider, "RIGHT", 10, 0)
+    scaleText:SetText(string.format("%d%%", (TotemBuddyDB.quickReactScale or 1.0) * 100))
+    scaleSlider:SetScript("OnValueChanged", function(self, value)
+        value = math.floor(value * 20 + 0.5) / 20
+        TotemBuddyDB.quickReactScale = value
+        scaleText:SetText(string.format("%d%%", value * 100))
+        addon.RefreshQuickBar()
+    end)
+    frame.scaleSlider = scaleSlider
 
     -- List container
     local list = CreateFrame("Frame", nil, frame)
-    list:SetPoint("TOPLEFT", 12, -66)
+    list:SetPoint("TOPLEFT", 12, -116)
     list:SetPoint("BOTTOMRIGHT", -12, 52)
     frame.list = list
     frame.rows = {}
@@ -375,6 +421,8 @@ function addon.RefreshQuickConfig()
     if not frame then return end
 
     frame.showCheck:SetChecked(TotemBuddyDB.quickReactEnabled)
+    if frame.lockCheck then frame.lockCheck:SetChecked(TotemBuddyDB.quickReactLocked) end
+    if frame.scaleSlider then frame.scaleSlider:SetValue(TotemBuddyDB.quickReactScale or 1.0) end
 
     for _, row in ipairs(frame.rows) do
         row:Hide()
@@ -417,6 +465,9 @@ function addon.RefreshQuickConfig()
         bindBtn:SetScript("OnClick", function(self)
             self:SetText("press key…")
             addon.CaptureKeybind(self, function(chord)
+                if chord and addon.WarnKeybindConflict then
+                    addon.WarnKeybindConflict(chord, "Quick: " .. (addon.GetTotemName(spellID) or spellID))
+                end
                 addon.SetQuickKeybind(spellID, chord)
             end)
         end)

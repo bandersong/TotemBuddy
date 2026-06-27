@@ -118,8 +118,20 @@ function addon.CreateActionBarFrame()
         manaOverlay:Hide()
         btn.manaOverlay = manaOverlay
 
-        -- Register for clicks BEFORE setting attributes
-        btn:RegisterForClicks("AnyDown", "AnyUp")
+        -- Spell cooldown swipe (so you can see when a totem with a real cooldown --
+        -- Mana Tide, Fire Nova, the Elementals -- is ready to recast again). The
+        -- GCD is filtered out in UpdateActiveCooldowns so it doesn't flicker.
+        local spellCooldown = CreateFrame("Cooldown", nil, btn, "CooldownFrameTemplate")
+        spellCooldown:SetAllPoints(icon)
+        spellCooldown:SetDrawEdge(false)
+        spellCooldown:SetHideCountdownNumbers(false)
+        spellCooldown:EnableMouse(false) -- don't let the swipe eat clicks to the cast button
+        btn.spellCooldown = spellCooldown
+
+        -- Register for clicks BEFORE setting attributes.
+        -- AnyDown only: AnyDown+AnyUp fired the secure cast twice per click and
+        -- double-ran the right-click PostClick (dismiss), which felt unreliable.
+        btn:RegisterForClicks("AnyDown")
 
         -- Set up secure casting (but not when ctrl is held)
         btn:SetAttribute("type1", "spell")
@@ -283,6 +295,22 @@ function addon.CreateActionBarFrame()
 
     -- Initial update of element visibility based on totem items
     addon.UpdateElementVisibility()
+end
+
+-- Update the spell-cooldown swipe on each active totem button. Driven by
+-- SPELL_UPDATE_COOLDOWN. GCD-length cooldowns (<= 2.5s) are ignored so the
+-- swipe only shows for totems with a meaningful recast cooldown.
+function addon.UpdateActiveCooldowns()
+    for element, btn in pairs(addon.UI.activeTotemButtons) do
+        if btn.spellCooldown and btn.totemName then
+            local start, duration, enable = GetSpellCooldown(btn.totemName)
+            if enable == 1 and start and duration and duration > 2.5 then
+                btn.spellCooldown:SetCooldown(start, duration)
+            else
+                btn.spellCooldown:Clear()
+            end
+        end
+    end
 end
 
 -- Update icon timer fonts when font size setting changes

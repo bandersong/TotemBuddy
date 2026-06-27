@@ -53,9 +53,38 @@ addon.defaults = {
     sets = {}, -- Named totem sets: { { name=, Earth=, Fire=, Water=, Air= }, ... }
     activeSet = nil, -- Index of the most recently applied set (display only)
     quickReactEnabled = false, -- Show the quick-react utility totem bar
-    quickReact = { 8177, 8143, 8166, 8170, 2484 }, -- spellIDs: Grounding, Tremor, Poison Cleansing, Disease Cleansing, Earthbind
+    quickReact = { 8177, 8143, 8166, 8170, 2484, 16190 }, -- spellIDs: Grounding, Tremor, Poison Cleansing, Disease Cleansing, Earthbind, Mana Tide
     quickReactKeybinds = {}, -- map spellID -> keybind chord string
     quickReactPos = { point = "CENTER", x = 0, y = -260 },
+    quickReactLocked = false, -- lock the quick-react bar so a stray click can't drag it
+    quickReactScale = 1.0, -- scale factor for the quick-react bar
+    manaTideMigrated = false, -- one-time flag: add Mana Tide to existing users' quick bars
+    -- Shield trackers (Earth Shield / Lightning Shield): assignable cast buttons
+    -- that also show the live charges + remaining duration of YOUR shield.
+    showEarthShield = true,
+    showLightningShield = true,
+    showWaterShield = true,
+    earthShieldTargetMode = "smart", -- smart | mouseover | target | player
+    shieldKeybinds = {}, -- map "earth"/"lightning" -> keybind chord string
+    shieldsPos = { point = "CENTER", x = 0, y = -320 },
+    shieldsScale = 1.0,
+    shieldsLocked = false,
+    shieldLowChargeWarn = 2, -- flash the count when charges <= this (0 = off)
+    -- Cooldown cluster (display-only trackers: NS, Mana Tide, trinkets, Healing Way)
+    showCooldownBar = true,
+    cooldownBarPos = { point = "CENTER", x = 0, y = -380 },
+    cooldownBarScale = 1.0,
+    cooldownBarLocked = false,
+    cooldownTrackTrinkets = true, -- track equipped trinket (slots 13/14) cooldowns
+    showHealingWay = true,        -- track your Healing Way stacks on focus/target
+    nsGlowEnabled = true,         -- Nature's Swiftness active screen glow
+    -- Dispel bar (Cure Disease / Cure Poison, smart mouseover cast)
+    showDispelBar = true,
+    dispelKeybinds = {},          -- "disease"/"poison" -> keybind chord
+    dispelTargetMode = "smart",   -- smart | mouseover | target | player
+    dispelPos = { point = "CENTER", x = 0, y = -420 },
+    dispelScale = 1.0,
+    dispelLocked = false,
     defaultMacrosEnabled = { -- Toggle default macros on/off
         TBEarth = true,
         TBFire = true,
@@ -198,6 +227,55 @@ addon.WEAPON_BUFFS = {
 
 -- Ankh item ID for Reincarnation
 addon.ANKH_ITEM_ID = 17030
+
+-- Shield trackers. spellID is the Rank 1 ID (cast-by-name auto-picks the highest
+-- trained rank); the buff name is rank-independent, so tracking matches on name.
+-- target = true means it can be cast on a friendly unit (Earth Shield); false
+-- means it is self-only (Lightning Shield).
+-- The three shaman shields. Earth Shield (cast on a friendly) has charges and is
+-- the one you put on the tank; Lightning Shield and Water Shield are self-only
+-- with charges. None have a cooldown, so the swipe is driven by buff duration.
+addon.SHIELDS = {
+    { key = "earth",     spellID = 974,   target = true,  color = { r = 0.4, g = 0.8, b = 0.4 } }, -- Earth Shield
+    { key = "lightning", spellID = 324,   target = false, color = { r = 0.4, g = 0.6, b = 1.0 } }, -- Lightning Shield
+    { key = "water",     spellID = 33736, target = false, color = { r = 0.2, g = 0.8, b = 0.9 } }, -- Water Shield
+}
+
+-- Lookup: shield key -> definition
+addon.SHIELD_BY_KEY = {}
+for _, s in ipairs(addon.SHIELDS) do
+    addon.SHIELD_BY_KEY[s.key] = s
+end
+
+-- Key resto cooldowns / procs (spell IDs are rank-independent for our needs)
+addon.NS_SPELL = 16188          -- Nature's Swiftness
+addon.MANA_TIDE_SPELL = 16190   -- Mana Tide Totem
+addon.HEALING_WAY_BUFF = 29203  -- Healing Way (buff Healing Wave puts on the target)
+
+-- Dispels: Cure Disease / Cure Poison, smart friendly-target cast buttons.
+addon.DISPELS = {
+    { key = "disease", spellID = 2870, color = { r = 0.6, g = 0.9, b = 0.4 } }, -- Cure Disease
+    { key = "poison",  spellID = 526,  color = { r = 0.4, g = 0.9, b = 0.4 } }, -- Cure Poison
+}
+addon.DISPEL_BY_KEY = {}
+for _, d in ipairs(addon.DISPELS) do
+    addon.DISPEL_BY_KEY[d.key] = d
+end
+
+-- Shared aura scan: find a buff by (rank-independent) localized name on `unit`.
+-- Pass filter "PLAYER" to only see auras YOU cast. Returns count, duration,
+-- expiration (TBC UnitBuff tuple: count=4, duration=6, expirationTime=7) or nil.
+function addon.ScanUnitAura(unit, name, filter)
+    if not unit or not name or not UnitExists(unit) then return nil end
+    for i = 1, 40 do
+        local n, _, _, count, _, duration, expiration = UnitBuff(unit, i, filter)
+        if not n then break end
+        if n == name then
+            return count or 0, duration or 0, expiration or 0
+        end
+    end
+    return nil
+end
 
 -- Totem item IDs (required in inventory to cast totems of each element)
 addon.TOTEM_ITEM_IDS = {

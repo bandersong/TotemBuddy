@@ -116,6 +116,9 @@ eventFrame:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED") -- For detecting weapon buf
 eventFrame:RegisterEvent("UNIT_SPELLCAST_START") -- For tracking pre-cast enchant state
 eventFrame:RegisterEvent("UNIT_AURA") -- For out-of-range detection via buff checking
 eventFrame:RegisterEvent("UNIT_POWER_UPDATE") -- For mana overlay updates
+eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE") -- Shield tracker: group changed
+eventFrame:RegisterEvent("PLAYER_TARGET_CHANGED") -- Shield tracker: rescan target
+eventFrame:RegisterEvent("PLAYER_FOCUS_CHANGED") -- Shield tracker: rescan focus
 
 eventFrame:SetScript("OnEvent", function(self, event, arg1, arg2, arg3)
     if event == "ADDON_LOADED" and arg1 == addonName then
@@ -202,6 +205,38 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1, arg2, arg3)
             TotemBuddyDB.quickReactPos = { point = "CENTER", x = 0, y = -260 }
         end
 
+        -- One-time migration: add Mana Tide Totem (16190) to the quick-react bar
+        -- for existing users (new installs already have it in the default list).
+        if not TotemBuddyDB.manaTideMigrated then
+            TotemBuddyDB.manaTideMigrated = true
+            local hasManaTide = false
+            for _, id in ipairs(TotemBuddyDB.quickReact) do
+                if id == 16190 then hasManaTide = true break end
+            end
+            if not hasManaTide then
+                table.insert(TotemBuddyDB.quickReact, 16190)
+            end
+        end
+
+        -- Shield keybinds: own table per DB (don't share the defaults reference)
+        if not TotemBuddyDB.shieldKeybinds or TotemBuddyDB.shieldKeybinds == defaults.shieldKeybinds then
+            TotemBuddyDB.shieldKeybinds = {}
+        end
+        if not TotemBuddyDB.shieldsPos or TotemBuddyDB.shieldsPos == defaults.shieldsPos then
+            TotemBuddyDB.shieldsPos = { point = "CENTER", x = 0, y = -320 }
+        end
+
+        -- Cooldown cluster + dispel bar: own tables per DB (not the shared defaults)
+        if not TotemBuddyDB.cooldownBarPos or TotemBuddyDB.cooldownBarPos == defaults.cooldownBarPos then
+            TotemBuddyDB.cooldownBarPos = { point = "CENTER", x = 0, y = -380 }
+        end
+        if not TotemBuddyDB.dispelKeybinds or TotemBuddyDB.dispelKeybinds == defaults.dispelKeybinds then
+            TotemBuddyDB.dispelKeybinds = {}
+        end
+        if not TotemBuddyDB.dispelPos or TotemBuddyDB.dispelPos == defaults.dispelPos then
+            TotemBuddyDB.dispelPos = { point = "CENTER", x = 0, y = -420 }
+        end
+
         -- Ensure defaultMacrosEnabled has all keys
         if not TotemBuddyDB.defaultMacrosEnabled then
             TotemBuddyDB.defaultMacrosEnabled = {}
@@ -235,6 +270,9 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1, arg2, arg3)
             addon.CreateTotemMacros()
             if addon.RefreshSetBindings then addon.RefreshSetBindings() end
             if addon.CreateQuickBar then addon.CreateQuickBar() end
+            if addon.CreateShieldBar then addon.CreateShieldBar() end
+            if addon.CreateCooldownBar then addon.CreateCooldownBar() end
+            if addon.CreateDispelBar then addon.CreateDispelBar() end
         end)
 
     elseif event == "PLAYER_TOTEM_UPDATE" then
@@ -297,6 +335,12 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1, arg2, arg3)
         if addon.ApplyPendingQuick then
             addon.ApplyPendingQuick()
         end
+        if addon.ApplyPendingShields then
+            addon.ApplyPendingShields()
+        end
+        if addon.ApplyPendingDispel then
+            addon.ApplyPendingDispel()
+        end
 
         -- Restore proper popup state after combat
         -- During combat, mouse was enabled for alpha-based visibility; now properly hide if needed
@@ -330,18 +374,29 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1, arg2, arg3)
         -- Update weapon buff button when equipment changes
         if arg1 == "player" then
             addon.UpdateWeaponBuffButton()
+            -- Trinkets may have changed -> rebuild the cooldown cluster
+            if addon.RefreshCooldownBar then addon.RefreshCooldownBar() end
         end
 
     elseif event == "SPELL_UPDATE_COOLDOWN" then
         -- Update Reincarnation cooldown display
         addon.UpdateReincarnationButton()
         if addon.UpdateQuickBarCooldowns then addon.UpdateQuickBarCooldowns() end
+        if addon.UpdateActiveCooldowns then addon.UpdateActiveCooldowns() end
+        if addon.UpdateCooldownBar then addon.UpdateCooldownBar() end
 
     elseif event == "UNIT_AURA" then
         -- Update totem dimming when player buffs change (for out-of-range detection)
         if arg1 == "player" then
             addon.UpdateTimers()
         end
+        -- Shield trackers care about any unit (Earth Shield is on others). The
+        -- Earth Shield group scan is throttled inside UpdateShields.
+        if addon.UpdateShields then addon.UpdateShields() end
+
+    elseif event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_TARGET_CHANGED" or event == "PLAYER_FOCUS_CHANGED" then
+        -- A relevant unit may now (or no longer) hold your Earth Shield: force a rescan.
+        if addon.UpdateShields then addon.UpdateShields(true) end
 
     elseif event == "UNIT_SPELLCAST_START" then
         -- Track enchant state before casting a weapon buff
@@ -360,6 +415,9 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1, arg2, arg3)
             if spellName then
                 addon.OnWeaponBuffCast(spellName)
             end
+            -- You just cast something — could be a shield. Force-rescan so the
+            -- tracker picks up the new charges/duration immediately.
+            if addon.UpdateShields then addon.UpdateShields(true) end
         end
 
     elseif event == "UNIT_POWER_UPDATE" then
@@ -385,5 +443,9 @@ timerUpdateFrame:SetScript("OnUpdate", function(self, delta)
         if addon.UI.weaponBuffButton then
             addon.UpdateWeaponBuffButton()
         end
+        -- Update shield trackers (charges + remaining duration countdown)
+        if addon.UpdateShields then addon.UpdateShields() end
+        -- Update cooldown cluster (swipes, NS pulse, Healing Way stacks)
+        if addon.UpdateCooldownBar then addon.UpdateCooldownBar() end
     end
 end)

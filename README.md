@@ -47,14 +47,26 @@ You **cannot** drop a whole set with one keypress — Blizzard's policy is **one
 
 ## Quick-React Bar
 
-A small, movable bar of one-click utility totems for reactive drops. Defaults: **Grounding, Tremor, Poison Cleansing, Disease Cleansing, Earthbind**.
+A small, movable bar of one-click utility totems for reactive drops. Defaults: **Grounding, Tremor, Poison Cleansing, Disease Cleansing, Earthbind, Mana Tide**.
 
 | Command | Description |
 |---------|-------------|
 | `/tb quick` | Toggle the quick-react bar |
 | `/tb quick config` | Open the quick-react settings window |
 
-In the settings window you can show/hide the bar, **add** a totem (by name or spell ID), **remove** one, and **bind a key** to each. **Ctrl+drag** the bar to move it. Each button casts exactly one totem per click or keypress.
+In the settings window you can show/hide the bar, **add** a totem (by name or spell ID), **remove** one, **scale**, **lock**, and **bind a key** to each (or **right-click a button** in-game to bind it). When unlocked, just **drag the bar** to move it. Buttons show a cooldown swipe and cast exactly one totem per click or keypress.
+
+---
+
+## Shields, Cooldowns & Dispels
+
+| Bar | What it does | Command |
+|-----|--------------|---------|
+| **Shield trinity** | Earth / Lightning / Water Shield — each a cast button **and** a tracker showing your charges + remaining duration; red when missing. Earth Shield smart-casts `@mouseover → target → player` and finds the shield you put on the tank. | `/tb shields` |
+| **Cooldown cluster** | At-a-glance trackers for Nature's Swiftness, Mana Tide, your trinkets, and your **Healing Way** stacks on the tank. Gold pulse when Nature's Swiftness is active. Display-only. | `/tb cooldowns` |
+| **Dispel bar** | Cure Disease + Cure Poison as smart `@mouseover` buttons — cleanse the unit under your cursor without losing your target. | `/tb dispel` |
+
+Each bar is movable (drag when unlocked), buttons take keybinds (right-click a button, or use the settings window), and all casting is one-press-one-cast. Binding a key already used by another TotemBuddy action prints a conflict warning.
 
 ---
 
@@ -97,6 +109,9 @@ TotemBuddy maintains these account macros (toggle them in **Config → Macros**)
 | `/tb delset <name>` | Delete a saved set |
 | `/tb quick` | Toggle the quick-react bar |
 | `/tb quick config` | Open quick-react settings |
+| `/tb shields` | Open the shield-tracker settings (Earth/Lightning/Water) |
+| `/tb cooldowns` | Toggle the cooldown cluster |
+| `/tb dispel` | Toggle the Cure Disease/Poison bar |
 
 ### Combat note
 Blizzard locks secure actions (casting setup, macro edits, keybindings, hiding frames) during combat. TotemBuddy queues any such change and applies it automatically when you leave combat. Popup bars stay clickable in place rather than vanishing mid-fight — enable **Always Show Popup** to avoid accidental clicks.

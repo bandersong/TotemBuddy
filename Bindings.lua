@@ -88,6 +88,63 @@ function addon.NotifySetsChanged()
     if addon.RefreshSetsTab then addon.RefreshSetsTab() end
 end
 
+-- ---- Keybind registry / conflict detection -----------------------------
+-- TotemBuddy hands out *override* bindings (sets, quick-react totems, shields).
+-- Override bindings silently win over each other and over normal bindings, so a
+-- duplicate chord = a silently dead button. This collects every chord TB itself
+-- has assigned so the UI can warn before a clash happens.
+--
+-- Returns a flat list of { chord=, label= } for every TB-assigned keybind.
+function addon.CollectTotemBuddyKeybinds()
+    local out = {}
+
+    for _, set in ipairs(addon.GetSets and addon.GetSets() or {}) do
+        if set.keybind and set.keybind ~= "" then
+            table.insert(out, { chord = set.keybind, label = "Set: " .. (set.name or "?") })
+        end
+    end
+
+    for spellID, chord in pairs(TotemBuddyDB and TotemBuddyDB.quickReactKeybinds or {}) do
+        if chord and chord ~= "" then
+            table.insert(out, { chord = chord, label = "Quick: " .. (addon.GetTotemName(spellID) or spellID) })
+        end
+    end
+
+    for key, chord in pairs(TotemBuddyDB and TotemBuddyDB.shieldKeybinds or {}) do
+        if chord and chord ~= "" then
+            local def = addon.SHIELD_BY_KEY and addon.SHIELD_BY_KEY[key]
+            local nm = def and addon.GetTotemName(def.spellID) or key
+            table.insert(out, { chord = chord, label = "Shield: " .. nm })
+        end
+    end
+
+    return out
+end
+
+-- Return the label of the FIRST existing TB binding that already uses `chord`,
+-- ignoring the one identified by `excludeLabel` (so re-binding the same slot
+-- doesn't flag itself). Returns nil if there's no clash.
+function addon.FindKeybindConflict(chord, excludeLabel)
+    if not chord or chord == "" then return nil end
+    for _, b in ipairs(addon.CollectTotemBuddyKeybinds()) do
+        if b.chord == chord and b.label ~= excludeLabel then
+            return b.label
+        end
+    end
+    return nil
+end
+
+-- Print a chat warning if `chord` clashes with another TB binding. Non-blocking:
+-- the override still applies (last-writer-wins), the user just gets told.
+function addon.WarnKeybindConflict(chord, excludeLabel)
+    local clash = addon.FindKeybindConflict(chord, excludeLabel)
+    if clash then
+        print("|cFFFFFF00TotemBuddy:|r " .. chord .. " is already bound to |cFFFFFFFF"
+            .. clash .. "|r — the older binding will stop working.")
+    end
+    return clash
+end
+
 -- Capture the next key chord and pass it (e.g. "SHIFT-1") to onCaptured.
 -- Escape calls onCaptured(nil) to clear. Modifier-only presses are ignored.
 local MODIFIER_KEYS = {

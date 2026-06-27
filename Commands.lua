@@ -160,6 +160,20 @@ SlashCmdList["TOTEMBUDDY"] = function(msg)
     elseif cmd == "quick" then
         local shown = addon.ToggleQuickBar()
         print("|cFF00FF00TotemBuddy:|r Quick-react bar " .. (shown and "shown" or "hidden"))
+    elseif subCmd == "shields" or cmd == "shields" then
+        -- /tb shields [config] -> open the shield tracker settings
+        if addon.ToggleShieldConfig then
+            addon.ToggleShieldConfig()
+        end
+    elseif cmd == "cooldowns" or cmd == "cds" then
+        TotemBuddyDB.showCooldownBar = not TotemBuddyDB.showCooldownBar
+        if addon.RefreshCooldownBar then addon.RefreshCooldownBar() end
+        print("|cFF00FF00TotemBuddy:|r Cooldown cluster " .. (TotemBuddyDB.showCooldownBar and "shown" or "hidden"))
+    elseif cmd == "dispel" or cmd == "dispels" then
+        if addon.ToggleDispelBar then
+            local shown = addon.ToggleDispelBar()
+            print("|cFF00FF00TotemBuddy:|r Dispel bar " .. (shown and "shown" or "hidden"))
+        end
     elseif cmd == "show" then
         if addon.UI.actionBarFrame then
             if addon.UI.actionBarFrame:IsShown() then
@@ -229,5 +243,8 @@ SlashCmdList["TOTEMBUDDY"] = function(msg)
         print("  /tb delset <name> - Delete a saved set")
         print("  /tb quick - Toggle the quick-react utility bar")
         print("  /tb quick config - Open the quick-react bar settings")
+        print("  /tb shields - Earth/Lightning/Water Shield tracker settings")
+        print("  /tb cooldowns - Toggle the cooldown cluster (NS, Mana Tide, trinkets, Healing Way)")
+        print("  /tb dispel - Toggle the Cure Disease/Poison bar")
     end
 end
