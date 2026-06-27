@@ -76,7 +76,8 @@ addon.defaults = {
     cooldownBarScale = 1.0,
     cooldownBarLocked = false,
     cooldownTrackTrinkets = true, -- track equipped trinket (slots 13/14) cooldowns
-    showHealingWay = true,        -- track your Healing Way stacks on focus/target
+    showHealingWay = true,          -- track your Healing Way stacks on focus/target
+    showAncestralHealing = true,    -- track the Ancestral Healing proc on focus/target
     nsGlowEnabled = true,         -- Nature's Swiftness active screen glow
     -- Dispel bar (Cure Disease / Cure Poison, smart mouseover cast)
     showDispelBar = true,
@@ -248,9 +249,10 @@ for _, s in ipairs(addon.SHIELDS) do
 end
 
 -- Key resto cooldowns / procs (spell IDs are rank-independent for our needs)
-addon.NS_SPELL = 16188          -- Nature's Swiftness
-addon.MANA_TIDE_SPELL = 16190   -- Mana Tide Totem
-addon.HEALING_WAY_BUFF = 29203  -- Healing Way (buff Healing Wave puts on the target)
+addon.NS_SPELL = 16188              -- Nature's Swiftness
+addon.MANA_TIDE_SPELL = 16190       -- Mana Tide Totem
+addon.HEALING_WAY_BUFF = 29203      -- Healing Way (buff Healing Wave puts on the target)
+addon.ANCESTRAL_HEALING_BUFF = 16236 -- Ancestral Healing proc (critical heal → 25% phys dmg reduction on target)
 
 -- Dispels: Cure Disease / Cure Poison, smart friendly-target cast buttons.
 addon.DISPELS = {
